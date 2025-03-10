@@ -134,7 +134,7 @@ class Messages:
     INVITATION_LINK = (
         "🔗 *Invitación a la Familia*\n\n"
         "Comparte este código QR o el siguiente enlace para invitar a alguien a unirse a tu familia:\n\n"
-        "{invite_link}\n\n"
+        "`{invite_link}`\n\n"
         "Instrucciones para el invitado:\n"
         "1. Haz clic en el enlace o escanea el código QR\n"
         "2. Se abrirá el bot\n"
