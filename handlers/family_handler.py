@@ -64,6 +64,46 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Guardar el ID de Telegram en el contexto para uso futuro
         context.user_data["telegram_id"] = telegram_id
         
+        # Primero, obtener la información completa de la familia para tener la lista de miembros
+        status_code, family = FamilyService.get_family(family_id, telegram_id)
+        print(f"Respuesta de get_family: status_code={status_code}, family={family}")
+        
+        # Verificar si hubo un error al obtener la información de la familia
+        if status_code >= 400 or not family:
+            error_msg = f"❌ Error al obtener la información de la familia. Código de error: {status_code}"
+            if isinstance(family, dict) and "detail" in family:
+                error_msg += f"\nDetalle: {family['detail']}"
+            print(f"Error al obtener información de familia: {error_msg}")
+            await update.message.reply_text(error_msg)
+            return ConversationHandler.END
+            
+        # Crear un diccionario de IDs de miembros a nombres
+        member_names = {}
+        if "members" in family and isinstance(family["members"], list):
+            for member in family["members"]:
+                member_id = member.get("id")
+                member_name = member.get("name", "Desconocido")
+                
+                # Guardar en el diccionario tanto como string como como ID nativo
+                if member_id is not None:
+                    # Guardar como string
+                    member_names[str(member_id)] = member_name
+                    
+                    # Intentar guardar como entero si es posible
+                    if isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
+                        try:
+                            numeric_id = int(member_id) if isinstance(member_id, str) else member_id
+                            member_names[numeric_id] = member_name
+                        except (ValueError, TypeError):
+                            pass
+                    
+                    # Guardar con el formato "Usuario X" para compatibilidad
+                    member_names[f"Usuario {member_id}"] = member_name
+                    
+        # Guardar los nombres de los miembros en el contexto
+        context.user_data["member_names"] = member_names
+        print(f"Nombres de miembros guardados en el contexto: {member_names}")
+        
         # Obtener los balances de la familia desde la API
         print(f"Solicitando balances a la API para la familia {family_id} con telegram_id={telegram_id}")
         status_code, balances = FamilyService.get_family_balances(family_id, telegram_id)
@@ -80,8 +120,8 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # No mostrar el menú aquí, solo informar del error
             return ConversationHandler.END
         
-        # Formatear los balances para mostrarlos al usuario
-        formatted_balances = Formatters.format_balances(balances)
+        # Formatear los balances para mostrarlos al usuario, pasando los nombres de los miembros
+        formatted_balances = Formatters.format_balances(balances, member_names)
         
         # Mostrar los balances al usuario
         await update.message.reply_text(
