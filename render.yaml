@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: financial-bot-telegram
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: API_BASE_URL
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: ADMIN_CHAT_ID
+        sync: false
+    healthCheckPath: /health 
