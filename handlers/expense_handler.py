@@ -105,6 +105,17 @@ async def get_expense_description(update: Update, context: ContextTypes.DEFAULT_
         # Obtener y validar la descripción del gasto
         description = update.message.text.strip()
         
+        # Verificar si el usuario quiere cancelar la operación
+        if description == "❌ Cancelar":
+            await update.message.reply_text(
+                Messages.CANCEL_OPERATION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            # Limpiar datos temporales
+            if "expense_data" in context.user_data:
+                del context.user_data["expense_data"]
+            return await _show_menu(update, context)
+        
         # Verificar que la descripción no esté vacía
         if not description:
             await update.message.reply_text(
@@ -150,6 +161,17 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         # Obtener el texto del monto ingresado por el usuario
         amount_text = update.message.text.strip()
+        
+        # Verificar si el usuario quiere cancelar la operación
+        if amount_text == "❌ Cancelar":
+            await update.message.reply_text(
+                Messages.CANCEL_OPERATION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            # Limpiar datos temporales
+            if "expense_data" in context.user_data:
+                del context.user_data["expense_data"]
+            return await _show_menu(update, context)
         
         # Intentar convertir el texto a un número flotante
         try:
@@ -258,7 +280,8 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Si la creación fue exitosa, mostrar mensaje de éxito
                 await update.message.reply_text(
                     Messages.SUCCESS_EXPENSE_CREATED,
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
                 )
                 
                 # Limpiar los datos del gasto del contexto
@@ -272,10 +295,11 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 error_message = response_data.get("error", "Error desconocido")
                 await send_error(update, context, f"Error al crear el gasto: {error_message}")
                 return ConversationHandler.END
-        else:
-            # Si el usuario cancela, mostrar mensaje y volver al menú principal
+        elif response == "❌ Cancelar":
+            # Si el usuario elige cancelar explícitamente
             await update.message.reply_text(
-                Messages.CANCEL_OPERATION
+                Messages.CANCEL_OPERATION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
             )
             
             # Limpiar los datos del gasto del contexto
@@ -284,6 +308,13 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Mostrar el menú principal
             return await _show_menu(update, context)
+        else:
+            # Si la respuesta no es reconocida
+            await update.message.reply_text(
+                "Opción no reconocida. Por favor, selecciona Confirmar o Cancelar.",
+                reply_markup=Keyboards.get_confirmation_keyboard()
+            )
+            return CONFIRM
             
     except Exception as e:
         # Manejo de errores inesperados

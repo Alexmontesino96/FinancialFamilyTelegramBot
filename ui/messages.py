@@ -83,6 +83,8 @@ class Messages:
     CREATE_PAYMENT_INTRO = "💳 Vamos a registrar un nuevo pago.\n\n" \
                           "¿A quién le estás pagando?"
     
+    SELECT_PAYMENT_RECIPIENT = "💳 ¿A quién le estás pagando? Selecciona un miembro de tu familia:"
+    
     CREATE_PAYMENT_AMOUNT = "👍 Destinatario seleccionado: *{to_member}*\n\n" \
                            "Ahora, ¿cuál es el monto del pago? (Ej: 100.50)"
     
@@ -117,7 +119,7 @@ class Messages:
     # Mensajes generales
     CANCEL_OPERATION = "❌ Operación cancelada."
     LOADING = "⏳ Cargando..."
-    FAMILY_INFO = "ℹ️ *Información de la familia*\n\n*Nombre:* {name}\n*ID:* `{id}`\n*Miembros:* {members_count}\n\n*Miembros:*\n{members_list}"
+    FAMILY_INFO = "ℹ️ *Información de la familia*\n\n*Nombre:* {name}\n*ID de Familia:* `{id}`\n*Miembros:* {members_count}\n\n*Miembros:*\n{members_list}"
     FAMILY_INVITATION = "🔗 *Invitación a la familia*\n\n*Nombre:* {name}\n*ID:* `{id}`\n\nComparte este ID con las personas que quieras invitar a tu familia."
     
     # Mensajes para balances

@@ -192,7 +192,8 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Pedir el monto del pago
         await update.message.reply_text(
-            Messages.ASK_PAYMENT_AMOUNT.format(member_name=selected_name),
+            Messages.CREATE_PAYMENT_AMOUNT.format(to_member=selected_name),
+            parse_mode="Markdown",
             reply_markup=Keyboards.get_cancel_keyboard()
         )
         
@@ -300,9 +301,9 @@ async def show_payment_confirmation(update: Update, context: ContextTypes.DEFAUL
 
 async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handles the user's confirmation response for registering a payment.
+    Handles the user's confirmation response for creating a payment.
     
-    This function processes the user's confirmation and registers the payment
+    This function processes the user's confirmation and creates the payment
     in the database if confirmed, or cancels the operation if rejected.
     
     Args:
@@ -314,66 +315,80 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     try:
         # Obtener la respuesta del usuario (confirmar o cancelar)
-        response = update.message.text
+        response = update.message.text.strip()
         
-        # Verificar si el usuario canceló la operación
-        if response != "✅ Confirmar":
-            await update.message.reply_text(
-                "Has cancelado el registro de pago.",
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
-            return ConversationHandler.END
-        
-        # Obtener los datos del pago del contexto
+        # Obtener los datos del pago desde el contexto
         payment_data = context.user_data.get("payment_data", {})
-        from_member_id = payment_data.get("from_member_id")
-        to_member_id = payment_data.get("to_member_id")
-        amount = payment_data.get("amount")
-        telegram_id = payment_data.get("telegram_id")
         
-        # Verificar que tenemos todos los datos necesarios
-        if not all([from_member_id, to_member_id, amount]):
-            await update.message.reply_text(
-                "Faltan datos para registrar el pago. Por favor, intenta nuevamente.",
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
-            return ConversationHandler.END
-        
-        # Registrar el pago en la base de datos a través del servicio
-        status_code, response_data = PaymentService.create_payment(
-            from_member=from_member_id,
-            to_member=to_member_id,
-            amount=amount,
-            telegram_id=telegram_id
-        )
-        
-        if status_code in [200, 201]:
-            # Si la creación fue exitosa, mostrar mensaje de éxito
-            await update.message.reply_text(
-                Messages.PAYMENT_CREATED_SUCCESS.format(
-                    member_name=payment_data.get("to_member_name", "el miembro"),
-                    amount=amount
-                ),
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
-        else:
-            # Si hubo un error en la creación, mostrar mensaje de error
-            error_message = response_data.get("error", "Error desconocido")
-            await update.message.reply_text(
-                f"Error al registrar el pago: {error_message}",
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
-        
-        # Limpiar los datos del pago del contexto
-        if "payment_data" in context.user_data:
-            del context.user_data["payment_data"]
+        # Verificar acciones específicas
+        if response == "✅ Confirmar":
+            # Si el usuario confirma, obtener datos necesarios para crear el pago
+            amount = payment_data.get("amount")
+            from_member_id = payment_data.get("from_member_id")
+            to_member_id = payment_data.get("to_member_id")
+            telegram_id = payment_data.get("telegram_id")
+            family_id = payment_data.get("family_id")
             
-        # Finalizar la conversación
-        return ConversationHandler.END
-        
+            # Validar que todos los datos requeridos estén presentes
+            if not all([from_member_id, to_member_id, amount]):
+                # Si falta algún dato, mostrar error
+                await update.message.reply_text(
+                    "Faltan datos para crear el pago. Por favor, inténtalo de nuevo.",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                return await _show_menu(update, context)
+            
+            # Crear el pago a través del servicio
+            status_code, response_data = PaymentService.create_payment(
+                family_id=family_id,
+                amount=amount,
+                from_member=from_member_id,
+                to_member=to_member_id,
+                telegram_id=telegram_id
+            )
+            
+            if status_code in [200, 201]:
+                # Si el pago se creó exitosamente, mostrar mensaje de éxito
+                await update.message.reply_text(
+                    Messages.SUCCESS_PAYMENT_CREATED,
+                    parse_mode="Markdown",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                
+                # Limpiar los datos del pago del contexto
+                if "payment_data" in context.user_data:
+                    del context.user_data["payment_data"]
+                
+                # Volver al menú principal
+                return await _show_menu(update, context)
+            else:
+                # Si hubo un error al crear el pago, mostrar mensaje de error
+                error_message = response_data.get("error", "Error desconocido")
+                await send_error(update, context, f"Error al registrar el pago: {error_message}")
+                return await _show_menu(update, context)
+        elif response == "❌ Cancelar":
+            # Si el usuario cancela, mostrar mensaje y volver al menú principal
+            await update.message.reply_text(
+                Messages.CANCEL_OPERATION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            
+            # Limpiar los datos del pago del contexto
+            if "payment_data" in context.user_data:
+                del context.user_data["payment_data"]
+            
+            # Volver al menú principal
+            return await _show_menu(update, context)
+        else:
+            # Si la respuesta no es reconocida
+            await update.message.reply_text(
+                "Opción no reconocida. Por favor, selecciona Confirmar o Cancelar.",
+                reply_markup=Keyboards.get_confirmation_keyboard()
+            )
+            return PAYMENT_CONFIRM
+            
     except Exception as e:
         # Manejo de errores inesperados
         print(f"Error en confirm_payment: {str(e)}")
         await send_error(update, context, f"Error al confirmar el pago: {str(e)}")
-        await _show_menu(update, context)
-        return ConversationHandler.END 
+        return await _show_menu(update, context) 
