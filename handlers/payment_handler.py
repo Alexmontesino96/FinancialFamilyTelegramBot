@@ -113,12 +113,49 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _show_menu(update, context)
             return ConversationHandler.END
         
-        # Guardar la lista de miembros en el contexto para uso posterior
+        # Obtener los balances de la familia para mostrar cuánto debe cada miembro
+        status_code, balances = FamilyService.get_family_balances(family_id, telegram_id)
+        print(f"Respuesta de get_family_balances: status_code={status_code}, balances={balances}")
+        
+        # Crear un diccionario para mapear miembros a sus saldos
+        balances_dict = {}
+        
+        if status_code == 200 and balances:
+            # Procesar los balances para encontrar cuánto debe cada miembro al usuario actual
+            for balance in balances:
+                # El saldo puede estar en diferentes formatos, dependiendo de la API
+                if isinstance(balance, dict):
+                    # Formato más detallado (diccionario con miembros y montos)
+                    # Buscar registros donde el usuario actual es acreedor (tiene que recibir dinero)
+                    if balance.get("creditor_id") == from_member_id:
+                        debtor_id = balance.get("debtor_id")
+                        amount = balance.get("amount", 0)
+                        if debtor_id and amount > 0:
+                            balances_dict[debtor_id] = amount
+                            
+                # Otros formatos posibles de la API podrían procesarse aquí
+        
+        # Guardar la lista de miembros y el diccionario de saldos en el contexto
         context.user_data["payment_data"]["members"] = members
         context.user_data["payment_data"]["other_members"] = other_members
+        context.user_data["payment_data"]["balances"] = balances_dict
         
-        # Crear teclado con los nombres de los miembros
-        member_buttons = [[member.get("name", "Desconocido")] for member in other_members]
+        # Crear teclado con los nombres de los miembros y sus saldos
+        member_buttons = []
+        for member in other_members:
+            member_id = member.get("id")
+            member_name = member.get("name", "Desconocido")
+            # Verificar si este miembro debe dinero al usuario actual
+            amount_owed = balances_dict.get(member_id, 0)
+            
+            # Si el miembro debe dinero, mostrar cuánto debe
+            button_text = member_name
+            if amount_owed > 0:
+                button_text = f"{member_name} (Te debe: ${amount_owed:.2f})"
+                
+            member_buttons.append([button_text])
+            
+        # Agregar botón de cancelar
         member_buttons.append(["❌ Cancelar"])
         
         # Mostrar mensaje para seleccionar el destinatario del pago
@@ -156,19 +193,30 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         int: The next conversation state
     """
     try:
-        # Obtener el nombre del miembro seleccionado
-        selected_name = update.message.text
+        # Obtener el texto completo seleccionado (puede incluir información de saldo)
+        selected_text = update.message.text
         
         # Verificar si el usuario canceló la operación
-        if selected_name == "❌ Cancelar":
+        if selected_text == "❌ Cancelar":
             await update.message.reply_text(
-                "Has cancelado el registro de pago.",
+                Messages.CANCEL_OPERATION,
                 reply_markup=Keyboards.get_main_menu_keyboard()
             )
-            return ConversationHandler.END
+            # Limpiar los datos del pago del contexto
+            if "payment_data" in context.user_data:
+                del context.user_data["payment_data"]
+            return await _show_menu(update, context)
         
         # Obtener la lista de otros miembros del contexto
         other_members = context.user_data.get("payment_data", {}).get("other_members", [])
+        
+        # Extraer solo el nombre del miembro (eliminando la parte de saldo si existe)
+        # El formato es "Nombre (Te debe: $XX.XX)" o simplemente "Nombre"
+        selected_name = selected_text
+        if "(" in selected_text:
+            selected_name = selected_text.split("(")[0].strip()
+        
+        print(f"Texto seleccionado: '{selected_text}', Nombre extraído: '{selected_name}'")
         
         # Buscar el miembro seleccionado por nombre
         to_member = next((m for m in other_members if m.get("name") == selected_name), None)
@@ -176,7 +224,7 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not to_member:
             # Si no se encuentra el miembro, mostrar error y volver a pedir
             await update.message.reply_text(
-                "Miembro no encontrado. Por favor, selecciona un miembro de la lista:",
+                f"Miembro '{selected_name}' no encontrado. Por favor, selecciona un miembro de la lista:",
                 reply_markup=ReplyKeyboardMarkup(
                     [[m.get("name", "Desconocido")] for m in other_members] + [["❌ Cancelar"]],
                     one_time_keyboard=True,
@@ -190,9 +238,17 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["payment_data"]["to_member_id"] = to_member_id
         context.user_data["payment_data"]["to_member_name"] = selected_name
         
-        # Pedir el monto del pago
+        # Verificar si hay un balance registrado para este miembro
+        balances = context.user_data.get("payment_data", {}).get("balances", {})
+        suggested_amount = balances.get(to_member_id, 0)
+        
+        # Pedir el monto del pago, sugeriendo el monto adeudado si existe
+        message_text = Messages.CREATE_PAYMENT_AMOUNT.format(to_member=selected_name)
+        if suggested_amount > 0:
+            message_text += f"\n\n💡 *Sugerencia:* Este miembro te debe ${suggested_amount:.2f}"
+        
         await update.message.reply_text(
-            Messages.CREATE_PAYMENT_AMOUNT.format(to_member=selected_name),
+            message_text,
             parse_mode="Markdown",
             reply_markup=Keyboards.get_cancel_keyboard()
         )
