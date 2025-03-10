@@ -102,4 +102,16 @@ class Messages:
     
     SHARE_INVITATION_ID = "📝 ID de la familia: `{family_id}`\n\nComparte este ID con quien quieras que se una a tu familia."
     
-    SHARE_INVITATION_QR = "También pueden escanear este código QR:" 
+    SHARE_INVITATION_QR = "También pueden escanear este código QR:"
+    
+    # Mensaje para el enlace de invitación
+    INVITATION_LINK = (
+        "🔗 *Invitación a la Familia*\n\n"
+        "Comparte este código QR o el siguiente enlace para invitar a alguien a unirse a tu familia:\n\n"
+        "{invite_link}\n\n"
+        "Instrucciones para el invitado:\n"
+        "1. Haz clic en el enlace o escanea el código QR\n"
+        "2. Se abrirá el bot\n"
+        "3. Presiona el botón 'INICIAR' o envía /start\n"
+        "4. Serás añadido automáticamente a la familia"
+    ) 
