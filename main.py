@@ -7,6 +7,7 @@ register payments, and view balances between family members.
 """
 
 import os
+import sys
 from telegram.ext import (
     Application, 
     CommandHandler, 
@@ -79,6 +80,26 @@ from handlers.edit_handler import (
 from utils.error_handler import register_error_handlers
 from health_check import start_health_check_server
 
+# Importar la función para verificar instancias duplicadas
+# Primero intentamos importar el verificador específico para Render
+try:
+    # Si estamos en Render, usamos el verificador específico
+    if os.environ.get('RENDER') == 'true':
+        from scripts.render_instance_check import check_render_instance
+        has_instance_checker = True
+        is_render_checker = True
+        logger.info("Usando verificador de instancias específico para Render")
+    else:
+        # Si no estamos en Render, usamos el verificador genérico
+        from scripts.check_bot_instances import check_bot_instances
+        has_instance_checker = True
+        is_render_checker = False
+        logger.info("Usando verificador de instancias genérico")
+except ImportError as e:
+    logger.warning(f"No se pudo importar el verificador de instancias: {e}. Se omitirá la verificación.")
+    has_instance_checker = False
+    is_render_checker = False
+
 def main():
     """
     Main function that initializes and starts the Telegram bot.
@@ -92,6 +113,18 @@ def main():
     
     The bot uses a conversation-based approach to guide users through different processes.
     """
+    # Verificar si hay instancias duplicadas del bot
+    if has_instance_checker:
+        logger.info("Verificando instancias duplicadas del bot...")
+        if is_render_checker:
+            should_continue = check_render_instance()
+        else:
+            should_continue = check_bot_instances()
+            
+        if not should_continue:
+            logger.info("Deteniendo esta instancia del bot debido a que ya hay otra instancia en ejecución.")
+            sys.exit(0)
+    
     # Start health check server if running in production environment (like Render)
     if os.environ.get('RENDER') == 'true':
         logger.info("Running in Render environment, starting health check server")

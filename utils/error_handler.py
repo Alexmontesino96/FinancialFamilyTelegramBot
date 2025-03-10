@@ -47,6 +47,15 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     
     # If we have admin chat ID, send detailed error information there
     admin_chat_id = os.getenv('ADMIN_CHAT_ID')
+    
+    # Si no hay un ADMIN_CHAT_ID configurado y hay un chat actual, usar ese chat para enviar errores detallados
+    # solo si el usuario es el propietario del bot (esto se puede personalizar según tus necesidades)
+    if not admin_chat_id and update and hasattr(update, 'effective_chat'):
+        # Aquí puedes agregar lógica para determinar si el usuario actual debe recibir errores detallados
+        # Por ejemplo, verificar si es un administrador o el propietario del bot
+        admin_chat_id = str(update.effective_chat.id)
+        logger.info(f"No ADMIN_CHAT_ID configured, using current chat: {admin_chat_id}")
+    
     if admin_chat_id:
         try:
             # Format update info if available
