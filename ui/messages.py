@@ -64,6 +64,21 @@ class Messages:
                             "*Pagado por:* {paid_by}\n\n" \
                             "¿Confirmas este gasto?"
     
+    # Mensajes para listar gastos
+    EXPENSES_LIST_HEADER = "📋 *Lista de Gastos*\n\n"
+    
+    EXPENSE_LIST_ITEM = (
+        "*ID:* `{id}`\n"
+        "*Descripción:* {description}\n"
+        "*Monto:* {amount}\n"
+        "*Pagado por:* {paid_by}\n"
+        "*Fecha:* {date}\n"
+        "----------------------------\n\n"
+    )
+    
+    # Mensajes para gastos no encontrados
+    NO_EXPENSES = "📋 No hay gastos registrados en esta familia."
+    
     # Mensajes de flujo de pagos
     CREATE_PAYMENT_INTRO = "💳 Vamos a registrar un nuevo pago.\n\n" \
                           "¿A quién le estás pagando?"
@@ -96,6 +111,9 @@ class Messages:
     LOADING = "⏳ Cargando..."
     FAMILY_INFO = "ℹ️ *Información de la familia*\n\n*Nombre:* {name}\n*ID:* `{id}`\n*Miembros:* {members_count}\n\n*Miembros:*\n{members_list}"
     FAMILY_INVITATION = "🔗 *Invitación a la familia*\n\n*Nombre:* {name}\n*ID:* `{id}`\n\nComparte este ID con las personas que quieras invitar a tu familia."
+    
+    # Mensajes para balances
+    BALANCES_HEADER = "💰 *Balances de la familia*\n\n"
     
     # Mensajes para compartir invitación
     SHARE_INVITATION_INTRO = "🔗 Comparte este enlace para invitar a alguien a unirse a tu familia:"
