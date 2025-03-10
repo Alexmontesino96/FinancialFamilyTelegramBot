@@ -15,6 +15,30 @@ class Formatters:
         return f"${amount:.2f}"
     
     @staticmethod
+    def format_date(date_str):
+        """
+        Formatea una fecha para mostrar en Telegram.
+        
+        Args:
+            date_str (str): Fecha en formato ISO (ej: 2025-03-10T18:30:01.115)
+            
+        Returns:
+            str: Fecha formateada (ej: 10/03/2025)
+        """
+        if not date_str:
+            return "Fecha desconocida"
+        
+        try:
+            # Extraer la parte de la fecha (antes de la T)
+            date_part = date_str.split("T")[0]
+            # Separar año, mes y día
+            year, month, day = date_part.split("-")
+            # Formatear como día/mes/año
+            return f"{day}/{month}/{year}"
+        except Exception:
+            return date_str
+    
+    @staticmethod
     def format_members(members):
         """Formatea la lista de miembros para mostrar en Telegram."""
         return "\n".join([f"- ID: {m['id']}, Nombre: {m['name']}, Teléfono: {m.get('phone', 'No disponible')}" for m in members])

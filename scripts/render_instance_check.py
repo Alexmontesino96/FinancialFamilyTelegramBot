@@ -12,6 +12,8 @@ import time
 import fcntl
 import logging
 import atexit
+import signal
+import psutil
 
 # Configurar logging
 logging.basicConfig(
@@ -63,6 +65,10 @@ def acquire_lock():
         # Registrar la función para liberar el bloqueo al salir
         atexit.register(release_lock)
         
+        # Registrar manejadores de señales para liberar el bloqueo en caso de terminación
+        signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(0))
+        signal.signal(signal.SIGINT, lambda signum, frame: sys.exit(0))
+        
         return True
         
     except IOError:
@@ -70,6 +76,21 @@ def acquire_lock():
         if lock_file_handle:
             lock_file_handle.close()
             lock_file_handle = None
+        
+        # Intentar leer el PID del archivo de bloqueo
+        try:
+            with open(LOCK_FILE, 'r') as f:
+                pid_str = f.read().strip()
+                if pid_str and pid_str.isdigit():
+                    pid = int(pid_str)
+                    # Verificar si el proceso con ese PID existe
+                    if not psutil.pid_exists(pid):
+                        logger.warning(f"El proceso con PID {pid} ya no existe. Eliminando archivo de bloqueo.")
+                        os.remove(LOCK_FILE)
+                        # Intentar adquirir el bloqueo nuevamente
+                        return acquire_lock()
+        except Exception as e:
+            logger.error(f"Error al leer el PID del archivo de bloqueo: {e}")
         
         logger.warning(f"No se pudo adquirir el bloqueo en {LOCK_FILE}. Otra instancia del bot ya está en ejecución.")
         return False
@@ -91,6 +112,33 @@ def check_render_instance():
     if os.environ.get('RENDER') != 'true':
         logger.info("No estamos en el entorno de Render, omitiendo la verificación de instancias")
         return True
+    
+    # Verificar si hay instancias del bot ejecutándose
+    bot_instances = []
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            # Verificar si es un proceso de Python
+            if proc.info['name'] and 'python' in proc.info['name'].lower():
+                cmdline = proc.info.get('cmdline', [])
+                # Verificar si está ejecutando main.py
+                if cmdline and any('main.py' in arg for arg in cmdline):
+                    # No incluir el proceso actual
+                    if proc.info['pid'] != os.getpid():
+                        bot_instances.append(proc.info['pid'])
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    
+    # Si hay otras instancias, intentar terminarlas
+    if bot_instances:
+        logger.warning(f"Se encontraron {len(bot_instances)} instancias del bot: {bot_instances}")
+        for pid in bot_instances:
+            try:
+                logger.info(f"Intentando terminar el proceso con PID {pid}")
+                os.kill(pid, signal.SIGTERM)
+                # Esperar un momento para que el proceso termine
+                time.sleep(1)
+            except Exception as e:
+                logger.error(f"Error al terminar el proceso {pid}: {e}")
     
     # Intentar adquirir el bloqueo
     if acquire_lock():
