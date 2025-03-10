@@ -126,11 +126,26 @@ class Formatters:
                 
                 # Formatear la fecha
                 created_at = expense.get("created_at", "")
-                date_str = created_at.split("T")[0] if created_at else "Fecha desconocida"
+                date_str = Formatters.format_date(created_at) if hasattr(Formatters, 'format_date') else (created_at.split("T")[0] if created_at else "Fecha desconocida")
                 
                 # Obtener el nombre de quien pagó
                 paid_by_id = expense.get("paid_by", "")
-                paid_by_name = member_names.get(str(paid_by_id), f"Usuario {paid_by_id}")
+                
+                # Buscar el nombre del miembro de varias maneras
+                paid_by_name = None
+                # 1. Buscar como string
+                if str(paid_by_id) in member_names:
+                    paid_by_name = member_names[str(paid_by_id)]
+                # 2. Buscar como número
+                elif isinstance(paid_by_id, int) or (isinstance(paid_by_id, str) and paid_by_id.isdigit()):
+                    numeric_id = int(paid_by_id) if isinstance(paid_by_id, str) else paid_by_id
+                    if numeric_id in member_names:
+                        paid_by_name = member_names[numeric_id]
+                # 3. Valor por defecto si no se encuentra
+                if not paid_by_name:
+                    paid_by_name = f"Usuario {paid_by_id}"
+                
+                print(f"Gasto pagado por ID: {paid_by_id}, Nombre encontrado: {paid_by_name}")
                 
                 # Formatear la lista de miembros entre los que se divide
                 split_among = expense.get("split_among", [])
@@ -143,7 +158,19 @@ class Formatters:
                         # Formato antiguo: cada elemento es un ID
                         split_names = []
                         for member_id in split_among:
-                            name = member_names.get(str(member_id), f"Usuario {member_id}")
+                            # Buscar el nombre del miembro de varias maneras
+                            name = None
+                            # 1. Buscar como string
+                            if str(member_id) in member_names:
+                                name = member_names[str(member_id)]
+                            # 2. Buscar como número
+                            elif isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
+                                numeric_id = int(member_id) if isinstance(member_id, str) else member_id
+                                if numeric_id in member_names:
+                                    name = member_names[numeric_id]
+                            # 3. Valor por defecto si no se encuentra
+                            if not name:
+                                name = f"Usuario {member_id}"
                             split_names.append(name)
                     
                     split_text = ", ".join(split_names)

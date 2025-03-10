@@ -15,6 +15,7 @@ from services.expense_service import ExpenseService
 from utils.context_manager import ContextManager
 from utils.helpers import send_error
 from services.member_service import MemberService
+from services.family_service import FamilyService
 import traceback
 
 # Eliminamos la importación circular
@@ -311,6 +312,7 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Verificar que el usuario pertenece a una familia
         status_code, member = MemberService.get_member(telegram_id)
+        print(f"Respuesta de get_member en listar_gastos: {status_code}, {member}")
         
         if status_code != 200 or not member or not member.get("family_id"):
             # Si el usuario no está en una familia, mostrar error
@@ -323,8 +325,34 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Obtener el ID de la familia del usuario
         family_id = member.get("family_id")
         
+        # Intentar obtener los nombres de los miembros desde el contexto
+        member_names = context.user_data.get("member_names", {})
+        
+        # Si no hay nombres en el contexto, intentar cargarlos desde la familia
+        if not member_names:
+            print("No se encontraron nombres de miembros en el contexto. Cargando desde la API...")
+            # Obtener información de la familia completa para tener la lista de miembros
+            status_code, family = FamilyService.get_family(family_id, telegram_id)
+            print(f"Respuesta de get_family en listar_gastos: {status_code}, {family}")
+            
+            if status_code == 200 and family and "members" in family:
+                # Crear diccionario de ID -> nombre para los miembros
+                member_names = {}
+                for family_member in family.get("members", []):
+                    member_id = family_member.get("id")
+                    member_name = family_member.get("name", f"Usuario {member_id}")
+                    # Guardar el ID como string y como número para mayor compatibilidad
+                    member_names[str(member_id)] = member_name
+                    if isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
+                        member_names[int(member_id) if isinstance(member_id, str) else member_id] = member_name
+                
+                # Guardar los nombres en el contexto para futuros usos
+                context.user_data["member_names"] = member_names
+                print(f"Nombres de miembros cargados y guardados en el contexto: {member_names}")
+        
         # Obtener todos los gastos de la familia desde el servicio
         status_code, expenses = ExpenseService.get_family_expenses(family_id, telegram_id)
+        print(f"Respuesta de get_family_expenses: {status_code}, {expenses}")
         
         if status_code != 200:
             # Si hubo un error al obtener los gastos, mostrar mensaje de error
@@ -354,13 +382,28 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             paid_by_id = expense.get("paid_by")
             created_at = expense.get("created_at", "")
             
-            # Buscar el nombre del miembro que pagó el gasto
-            paid_by_name = "Desconocido"
-            for family_member in member.get("family", {}).get("members", []):
-                if family_member.get("id") == paid_by_id:
-                    paid_by_name = family_member.get("name", "Desconocido")
-                    break
-                    
+            # Intentar buscar el nombre del miembro de diferentes maneras
+            paid_by_name = None
+            # 1. Buscar como string
+            if str(paid_by_id) in member_names:
+                paid_by_name = member_names[str(paid_by_id)]
+            # 2. Buscar como número
+            elif isinstance(paid_by_id, int) or (isinstance(paid_by_id, str) and paid_by_id.isdigit()):
+                numeric_id = int(paid_by_id) if isinstance(paid_by_id, str) else paid_by_id
+                if numeric_id in member_names:
+                    paid_by_name = member_names[numeric_id]
+            # 3. Buscar directamente en los miembros de la familia
+            if not paid_by_name and "family" in context.user_data and "members" in context.user_data["family"]:
+                for family_member in context.user_data["family"]["members"]:
+                    if family_member.get("id") == paid_by_id:
+                        paid_by_name = family_member.get("name")
+                        break
+            # 4. Valor por defecto si no se encuentra
+            if not paid_by_name:
+                paid_by_name = f"Usuario {paid_by_id}"
+                
+            print(f"Gasto pagado por ID: {paid_by_id}, Nombre encontrado: {paid_by_name}")
+            
             # Formatear la fecha de creación del gasto
             formatted_date = Formatters.format_date(created_at)
             
