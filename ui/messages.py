@@ -106,6 +106,12 @@ class Messages:
     
     EDIT_EXPENSE_AMOUNT = "📝 Ingresa el nuevo monto para el gasto:\n\n{details}"
     
+    # Mensajes adicionales para edición/eliminación
+    INVALID_EDIT_OPTION = "❌ Opción de edición no válida. Por favor, selecciona una opción del menú."
+    NO_EXPENSES_TO_EDIT = "❌ No hay gastos registrados para editar."
+    NO_EXPENSES_TO_DELETE = "❌ No hay gastos registrados para eliminar."
+    NO_PAYMENTS_TO_DELETE = "❌ No hay pagos registrados para eliminar."
+    
     # Mensajes generales
     CANCEL_OPERATION = "❌ Operación cancelada."
     LOADING = "⏳ Cargando..."
