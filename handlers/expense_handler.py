@@ -208,12 +208,13 @@ async def show_expense_confirmation(update: Update, context: ContextTypes.DEFAUL
     
     # Mostrar mensaje de confirmación con los detalles del gasto
     await update.message.reply_text(
-        Messages.CONFIRM_EXPENSE.format(
+        Messages.CREATE_EXPENSE_CONFIRM.format(
             description=description,
-            amount=Formatters.format_currency(amount)
+            amount=amount,
+            paid_by="Tú"
         ),
         parse_mode="Markdown",
-        reply_markup=Keyboards.get_confirm_keyboard()
+        reply_markup=Keyboards.get_confirmation_keyboard()
     )
     # Pasar al siguiente estado: confirmar gasto
     return CONFIRM
@@ -234,9 +235,9 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     try:
         # Obtener la respuesta del usuario (confirmar o cancelar)
-        response = update.message.text.strip().lower()
+        response = update.message.text.strip()
         
-        if response == "✅ confirmar":
+        if response == "✅ Confirmar":
             # Si el usuario confirma, obtener los datos del gasto
             expense_data = context.user_data.get("expense_data", {})
             description = expense_data.get("description", "")
@@ -255,10 +256,7 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if status_code in [200, 201]:
                 # Si la creación fue exitosa, mostrar mensaje de éxito
                 await update.message.reply_text(
-                    Messages.EXPENSE_CREATED_SUCCESS.format(
-                        description=description,
-                        amount=Formatters.format_currency(amount)
-                    ),
+                    Messages.SUCCESS_EXPENSE_CREATED,
                     parse_mode="Markdown"
                 )
                 
@@ -276,7 +274,7 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             # Si el usuario cancela, mostrar mensaje y volver al menú principal
             await update.message.reply_text(
-                "Has cancelado la creación del gasto."
+                Messages.CANCEL_OPERATION
             )
             
             # Limpiar los datos del gasto del contexto

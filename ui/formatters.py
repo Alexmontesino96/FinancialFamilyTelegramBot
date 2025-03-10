@@ -2,6 +2,19 @@ class Formatters:
     """Formateadores para mostrar datos en Telegram."""
     
     @staticmethod
+    def format_currency(amount):
+        """
+        Formatea un valor monetario para mostrar en Telegram.
+        
+        Args:
+            amount (float): Monto a formatear
+            
+        Returns:
+            str: Monto formateado como string (ej: $100.50)
+        """
+        return f"${amount:.2f}"
+    
+    @staticmethod
     def format_members(members):
         """Formatea la lista de miembros para mostrar en Telegram."""
         return "\n".join([f"- ID: {m['id']}, Nombre: {m['name']}, Teléfono: {m.get('phone', 'No disponible')}" for m in members])
