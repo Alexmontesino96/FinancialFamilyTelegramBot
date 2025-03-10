@@ -7,6 +7,60 @@ class Formatters:
         return "\n".join([f"- ID: {m['id']}, Nombre: {m['name']}, Teléfono: {m.get('phone', 'No disponible')}" for m in members])
     
     @staticmethod
+    def format_family_info(family):
+        """
+        Formatea la información de una familia para mostrar en Telegram.
+        
+        Args:
+            family (dict): Diccionario con la información de la familia
+            
+        Returns:
+            str: Texto formateado con la información de la familia
+        """
+        try:
+            # Verificar que family sea un diccionario
+            if not isinstance(family, dict):
+                print(f"Error: family no es un diccionario, es {type(family)}")
+                return "Error al formatear la información de la familia."
+            
+            # Obtener datos básicos de la familia
+            family_id = family.get('id', 'Desconocido')
+            name = family.get('name', 'Sin nombre')
+            created_at = family.get('created_at', '')
+            
+            # Formatear la fecha de creación
+            date_str = created_at.split("T")[0] if created_at else "Fecha desconocida"
+            
+            # Obtener la lista de miembros
+            members = family.get('members', [])
+            members_count = len(members)
+            
+            # Formatear la lista de miembros
+            members_list = []
+            for member in members:
+                member_id = member.get('id', 'Desconocido')
+                member_name = member.get('name', 'Sin nombre')
+                member_phone = member.get('phone', 'No disponible')
+                members_list.append(f"• *{member_name}* (ID: `{member_id}`)")
+            
+            members_text = "\n".join(members_list) if members_list else "No hay miembros registrados."
+            
+            # Construir el mensaje completo
+            from ui.messages import Messages
+            return Messages.FAMILY_INFO.format(
+                name=name,
+                id=family_id,
+                members_count=members_count,
+                members_list=members_text
+            )
+            
+        except Exception as e:
+            print(f"Error al formatear información de familia: {e}")
+            import traceback
+            traceback.print_exc()
+            return "Error al formatear la información de la familia."
+    
+    @staticmethod
     def format_expenses(expenses, member_names=None):
         """Formatea la lista de gastos para mostrar en Telegram.
         
