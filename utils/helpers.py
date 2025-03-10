@@ -73,7 +73,10 @@ def parse_deep_link(args):
         return None, None
     
     arg = args[0]
+    # Manejar tanto "join_" como "join" sin guión bajo
     if arg.startswith("join_"):
         return "join", arg.replace("join_", "")
+    elif arg.startswith("join"):
+        return "join", arg.replace("join", "")
     
     return None, None 

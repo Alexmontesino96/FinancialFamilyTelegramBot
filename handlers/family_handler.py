@@ -187,8 +187,8 @@ async def compartir_invitacion(update: Update, context: ContextTypes.DEFAULT_TYP
         # Obtener el nombre del bot para generar el enlace de invitación
         bot_username = (await context.bot.get_me()).username
         
-        # Crear el enlace de invitación con el ID de la familia
-        invite_link = f"https://t.me/{bot_username}?start=join_{family_id}"
+        # Crear el enlace de invitación con el ID de la familia (sin guión bajo después de "join")
+        invite_link = f"https://t.me/{bot_username}?start=join{family_id}"
         
         # Generar un código QR con el enlace de invitación
         qr_image = create_qr_code(invite_link)
