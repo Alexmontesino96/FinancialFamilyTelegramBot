@@ -341,14 +341,22 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for family_member in family.get("members", []):
                     member_id = family_member.get("id")
                     member_name = family_member.get("name", f"Usuario {member_id}")
-                    # Guardar el ID como string y como número para mayor compatibilidad
+                    print(f"Procesando miembro: ID={member_id} ({type(member_id)}), Nombre={member_name}")
+                    
+                    # Guardar el ID como string siempre
                     member_names[str(member_id)] = member_name
+                    
+                    # Si el ID es un número o puede convertirse a número, también guardarlo como número
                     if isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
-                        member_names[int(member_id) if isinstance(member_id, str) else member_id] = member_name
+                        numeric_id = int(member_id) if isinstance(member_id, str) else member_id
+                        member_names[numeric_id] = member_name
                 
                 # Guardar los nombres en el contexto para futuros usos
                 context.user_data["member_names"] = member_names
                 print(f"Nombres de miembros cargados y guardados en el contexto: {member_names}")
+                
+                # También guardar la familia completa para referencia futura
+                context.user_data["family"] = family
         
         # Obtener todos los gastos de la familia desde el servicio
         status_code, expenses = ExpenseService.get_family_expenses(family_id, telegram_id)
@@ -382,28 +390,41 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             paid_by_id = expense.get("paid_by")
             created_at = expense.get("created_at", "")
             
+            print(f"Procesando gasto: ID={expense_id}, pagado por ID={paid_by_id} ({type(paid_by_id)})")
+            
             # Intentar buscar el nombre del miembro de diferentes maneras
             paid_by_name = None
-            # 1. Buscar como string
-            if str(paid_by_id) in member_names:
-                paid_by_name = member_names[str(paid_by_id)]
-            # 2. Buscar como número
-            elif isinstance(paid_by_id, int) or (isinstance(paid_by_id, str) and paid_by_id.isdigit()):
-                numeric_id = int(paid_by_id) if isinstance(paid_by_id, str) else paid_by_id
-                if numeric_id in member_names:
-                    paid_by_name = member_names[numeric_id]
+            
+            # 1. Buscar como string (el caso más común y seguro)
+            if paid_by_id is not None:
+                str_id = str(paid_by_id)
+                if str_id in member_names:
+                    paid_by_name = member_names[str_id]
+                    print(f"Nombre encontrado usando string ID: {paid_by_name}")
+            
+            # 2. Buscar como número si es aplicable
+            if not paid_by_name and paid_by_id is not None:
+                if isinstance(paid_by_id, int) or (isinstance(paid_by_id, str) and paid_by_id.isdigit()):
+                    numeric_id = int(paid_by_id) if isinstance(paid_by_id, str) else paid_by_id
+                    if numeric_id in member_names:
+                        paid_by_name = member_names[numeric_id]
+                        print(f"Nombre encontrado usando numeric ID: {paid_by_name}")
+            
             # 3. Buscar directamente en los miembros de la familia
             if not paid_by_name and "family" in context.user_data and "members" in context.user_data["family"]:
                 for family_member in context.user_data["family"]["members"]:
-                    if family_member.get("id") == paid_by_id:
+                    member_id = family_member.get("id")
+                    # Comparar como strings para mayor seguridad
+                    if str(member_id) == str(paid_by_id):
                         paid_by_name = family_member.get("name")
+                        print(f"Nombre encontrado en familia directamente: {paid_by_name}")
                         break
+            
             # 4. Valor por defecto si no se encuentra
             if not paid_by_name:
                 paid_by_name = f"Usuario {paid_by_id}"
+                print(f"No se encontró nombre, usando valor por defecto: {paid_by_name}")
                 
-            print(f"Gasto pagado por ID: {paid_by_id}, Nombre encontrado: {paid_by_name}")
-            
             # Formatear la fecha de creación del gasto
             formatted_date = Formatters.format_date(created_at)
             

@@ -130,22 +130,30 @@ class Formatters:
                 
                 # Obtener el nombre de quien pagó
                 paid_by_id = expense.get("paid_by", "")
+                print(f"Gasto pagado por ID={paid_by_id} ({type(paid_by_id)})")
                 
                 # Buscar el nombre del miembro de varias maneras
                 paid_by_name = None
-                # 1. Buscar como string
-                if str(paid_by_id) in member_names:
-                    paid_by_name = member_names[str(paid_by_id)]
-                # 2. Buscar como número
-                elif isinstance(paid_by_id, int) or (isinstance(paid_by_id, str) and paid_by_id.isdigit()):
-                    numeric_id = int(paid_by_id) if isinstance(paid_by_id, str) else paid_by_id
-                    if numeric_id in member_names:
-                        paid_by_name = member_names[numeric_id]
+                
+                # 1. Buscar como string (el caso más común y seguro)
+                if paid_by_id is not None:
+                    str_id = str(paid_by_id)
+                    if str_id in member_names:
+                        paid_by_name = member_names[str_id]
+                        print(f"Nombre encontrado usando string ID: {paid_by_name}")
+                
+                # 2. Buscar como número si es aplicable
+                if not paid_by_name and paid_by_id is not None:
+                    if isinstance(paid_by_id, int) or (isinstance(paid_by_id, str) and paid_by_id.isdigit()):
+                        numeric_id = int(paid_by_id) if isinstance(paid_by_id, str) else paid_by_id
+                        if numeric_id in member_names:
+                            paid_by_name = member_names[numeric_id]
+                            print(f"Nombre encontrado usando numeric ID: {paid_by_name}")
+                
                 # 3. Valor por defecto si no se encuentra
                 if not paid_by_name:
                     paid_by_name = f"Usuario {paid_by_id}"
-                
-                print(f"Gasto pagado por ID: {paid_by_id}, Nombre encontrado: {paid_by_name}")
+                    print(f"No se encontró nombre, usando valor por defecto: {paid_by_name}")
                 
                 # Formatear la lista de miembros entre los que se divide
                 split_among = expense.get("split_among", [])
@@ -160,17 +168,24 @@ class Formatters:
                         for member_id in split_among:
                             # Buscar el nombre del miembro de varias maneras
                             name = None
+                            
                             # 1. Buscar como string
-                            if str(member_id) in member_names:
-                                name = member_names[str(member_id)]
+                            if member_id is not None:
+                                str_id = str(member_id)
+                                if str_id in member_names:
+                                    name = member_names[str_id]
+                            
                             # 2. Buscar como número
-                            elif isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
-                                numeric_id = int(member_id) if isinstance(member_id, str) else member_id
-                                if numeric_id in member_names:
-                                    name = member_names[numeric_id]
-                            # 3. Valor por defecto si no se encuentra
+                            if not name and member_id is not None:
+                                if isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
+                                    numeric_id = int(member_id) if isinstance(member_id, str) else member_id
+                                    if numeric_id in member_names:
+                                        name = member_names[numeric_id]
+                            
+                            # 3. Valor por defecto
                             if not name:
                                 name = f"Usuario {member_id}"
+                                
                             split_names.append(name)
                     
                     split_text = ", ".join(split_names)
