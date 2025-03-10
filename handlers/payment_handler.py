@@ -8,7 +8,7 @@ managing payment data throughout the conversation flow.
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from config import SELECT_TO_MEMBER, PAYMENT_AMOUNT, CONFIRM
+from config import SELECT_TO_MEMBER, PAYMENT_AMOUNT, PAYMENT_CONFIRM
 from ui.keyboards import Keyboards
 from ui.messages import Messages
 from services.payment_service import PaymentService
@@ -282,22 +282,41 @@ async def show_payment_confirmation(update: Update, context: ContextTypes.DEFAUL
     Returns:
         int: The next conversation state
     """
-    # Obtener los datos del pago del contexto
-    payment_data = context.user_data.get("payment_data", {})
-    to_member_name = payment_data.get("to_member_name", "Desconocido")
-    amount = payment_data.get("amount", 0)
-    
-    # Mostrar mensaje de confirmación con los detalles del pago
-    await update.message.reply_text(
-        Messages.CONFIRM_PAYMENT.format(
-            member_name=to_member_name,
-            amount=amount
-        ),
-        reply_markup=Keyboards.get_confirm_keyboard()
-    )
-    
-    # Pasar al siguiente estado: confirmar pago
-    return PAYMENT_AMOUNT + 1  # PAYMENT_CONFIRM
+    try:
+        # Obtener los datos del pago del contexto
+        payment_data = context.user_data.get("payment_data", {})
+        to_member_name = payment_data.get("to_member_name", "Desconocido")
+        amount = payment_data.get("amount", 0)
+        
+        # Obtener información sobre el miembro que realiza el pago
+        from_member_id = payment_data.get("from_member_id")
+        from_member_name = "Tú"  # Por defecto
+        
+        if "members" in payment_data:
+            for member in payment_data.get("members", []):
+                if member.get("id") == from_member_id:
+                    from_member_name = member.get("name", "Tú")
+                    break
+        
+        # Mostrar mensaje de confirmación con los detalles del pago
+        await update.message.reply_text(
+            Messages.CREATE_PAYMENT_CONFIRM.format(
+                from_member=from_member_name,
+                to_member=to_member_name,
+                amount=amount
+            ),
+            parse_mode="Markdown",
+            reply_markup=Keyboards.get_confirmation_keyboard()
+        )
+        
+        # Pasar al siguiente estado: confirmar pago
+        return PAYMENT_CONFIRM
+    except Exception as e:
+        # Manejo de errores inesperados
+        print(f"Error en show_payment_confirmation: {str(e)}")
+        await send_error(update, context, f"Error al mostrar la confirmación del pago: {str(e)}")
+        await _show_menu(update, context)
+        return ConversationHandler.END
 
 async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
