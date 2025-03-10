@@ -111,6 +111,8 @@ class Messages:
     NO_EXPENSES_TO_EDIT = "❌ No hay gastos registrados para editar."
     NO_EXPENSES_TO_DELETE = "❌ No hay gastos registrados para eliminar."
     NO_PAYMENTS_TO_DELETE = "❌ No hay pagos registrados para eliminar."
+    NO_PAYMENTS_TO_EDIT = "❌ No hay pagos registrados para editar."
+    ITEM_NOT_FOUND = "❌ No se encontró el elemento seleccionado."
     
     # Mensajes generales
     CANCEL_OPERATION = "❌ Operación cancelada."

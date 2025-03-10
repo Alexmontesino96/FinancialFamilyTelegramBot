@@ -105,7 +105,7 @@ async def handle_edit_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         telegram_id = str(update.effective_user.id)
         
         # Handle different edit options
-        if option == "📝 Editar Gasto":
+        if option == "📝 Editar Gastos":
             # Get all expenses for the family
             status_code, expenses = ExpenseService.get_family_expenses(family_id, telegram_id)
             
@@ -155,7 +155,7 @@ async def handle_edit_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Move to the next state: select expense
             return SELECT_EXPENSE
             
-        elif option == "🗑️ Eliminar Gasto":
+        elif option == "🗑️ Eliminar Gastos":
             # Get all expenses for the family
             status_code, expenses = ExpenseService.get_family_expenses(family_id, telegram_id)
             
@@ -205,7 +205,7 @@ async def handle_edit_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Move to the next state: select expense
             return SELECT_EXPENSE
             
-        elif option == "🗑️ Eliminar Pago":
+        elif option == "🗑️ Eliminar Pagos":
             # Get all payments for the family
             status_code, payments = PaymentService.get_family_payments(family_id, telegram_id)
             
@@ -256,6 +256,19 @@ async def handle_edit_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Move to the next state: select payment
             return SELECT_PAYMENT
             
+        elif option == "📝 Editar Pagos":
+            # Mostrar mensaje de que esta funcionalidad no está disponible aún
+            await update.message.reply_text(
+                "La funcionalidad de editar pagos no está disponible en esta versión. Próximamente estará disponible.",
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
+            
+        elif option == "↩️ Volver al Menú":
+            # Mostrar el menú principal
+            from handlers.menu_handler import show_main_menu
+            return await show_main_menu(update, context)
+            
         else:
             # If the option is not recognized, show error message
             await update.message.reply_text(
@@ -287,21 +300,22 @@ async def handle_select_expense(update: Update, context: ContextTypes.DEFAULT_TY
     """
     try:
         # Get the selected expense button text
-        selected_expense_text = update.message.text
+        selected_text = update.message.text
         
-        # Check if the user canceled the operation
-        if selected_expense_text == "❌ Cancelar":
+        # Check if the user wants to cancel
+        if selected_text == "❌ Cancelar":
+            # Show cancel message and return to main menu
             await update.message.reply_text(
-                Messages.OPERATION_CANCELED,
+                Messages.CANCEL_OPERATION,
                 reply_markup=Keyboards.get_main_menu_keyboard()
             )
             return ConversationHandler.END
         
-        # Get the expense ID from the button mapping
+        # Get the expense ID from the context using the button text
         expense_buttons = context.user_data["edit_data"].get("expense_buttons", {})
-        expense_id = expense_buttons.get(selected_expense_text)
+        selected_id = expense_buttons.get(selected_text)
         
-        if not expense_id:
+        if not selected_id:
             # If the expense ID is not found, show error message
             await update.message.reply_text(
                 Messages.EXPENSE_NOT_FOUND,
@@ -310,24 +324,51 @@ async def handle_select_expense(update: Update, context: ContextTypes.DEFAULT_TY
             return ConversationHandler.END
         
         # Save the selected expense ID in the context
-        context.user_data["edit_data"]["selected_id"] = expense_id
+        context.user_data["edit_data"]["selected_id"] = selected_id
         
-        # Get the selected option (edit or delete)
+        # Get the selected expense details
+        expenses = context.user_data["edit_data"].get("expenses", [])
+        selected_expense = None
+        for expense in expenses:
+            if expense.get("id") == selected_id:
+                selected_expense = expense
+                break
+        
+        if not selected_expense:
+            # If the expense is not found, show error message
+            await update.message.reply_text(
+                Messages.EXPENSE_NOT_FOUND,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
+        
+        # Save the selected expense in the context
+        context.user_data["edit_data"]["selected_expense"] = selected_expense
+        
+        # Get the option (edit or delete)
         option = context.user_data["edit_data"].get("option")
         
-        if option == "📝 Editar Gasto":
+        if option == "📝 Editar Gastos":
             # For editing, ask for the new amount
             await update.message.reply_text(
-                Messages.ENTER_NEW_EXPENSE_AMOUNT,
+                Messages.EDIT_EXPENSE_AMOUNT.format(
+                    details=f"*Descripción:* {selected_expense.get('description', 'Sin descripción')}\n"
+                           f"*Monto actual:* ${selected_expense.get('amount', 0):.2f}"
+                ),
+                parse_mode="Markdown",
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
             return EDIT_EXPENSE_AMOUNT
             
-        elif option == "🗑️ Eliminar Gasto":
+        elif option == "🗑️ Eliminar Gastos":
             # For deleting, ask for confirmation
             await update.message.reply_text(
-                Messages.CONFIRM_DELETE_EXPENSE.format(expense=selected_expense_text),
-                reply_markup=Keyboards.get_confirm_keyboard()
+                Messages.CONFIRM_DELETE_EXPENSE.format(
+                    details=f"*Descripción:* {selected_expense.get('description', 'Sin descripción')}\n"
+                           f"*Monto:* ${selected_expense.get('amount', 0):.2f}"
+                ),
+                parse_mode="Markdown",
+                reply_markup=Keyboards.get_confirmation_keyboard()
             )
             return CONFIRM_DELETE
             
@@ -439,7 +480,7 @@ async def handle_select_payment(update: Update, context: ContextTypes.DEFAULT_TY
     Handles the selection of a payment to delete.
     
     This function processes the user's selection of which payment they want
-    to delete and asks for confirmation.
+    to delete and routes to the appropriate next step.
     
     Args:
         update (Update): Telegram Update object
@@ -450,21 +491,22 @@ async def handle_select_payment(update: Update, context: ContextTypes.DEFAULT_TY
     """
     try:
         # Get the selected payment button text
-        selected_payment_text = update.message.text
+        selected_text = update.message.text
         
-        # Check if the user canceled the operation
-        if selected_payment_text == "❌ Cancelar":
+        # Check if the user wants to cancel
+        if selected_text == "❌ Cancelar":
+            # Show cancel message and return to main menu
             await update.message.reply_text(
-                Messages.OPERATION_CANCELED,
+                Messages.CANCEL_OPERATION,
                 reply_markup=Keyboards.get_main_menu_keyboard()
             )
             return ConversationHandler.END
         
-        # Get the payment ID from the button mapping
+        # Get the payment ID from the context using the button text
         payment_buttons = context.user_data["edit_data"].get("payment_buttons", {})
-        payment_id = payment_buttons.get(selected_payment_text)
+        selected_id = payment_buttons.get(selected_text)
         
-        if not payment_id:
+        if not selected_id:
             # If the payment ID is not found, show error message
             await update.message.reply_text(
                 Messages.PAYMENT_NOT_FOUND,
@@ -473,17 +515,55 @@ async def handle_select_payment(update: Update, context: ContextTypes.DEFAULT_TY
             return ConversationHandler.END
         
         # Save the selected payment ID in the context
-        context.user_data["edit_data"]["selected_id"] = payment_id
+        context.user_data["edit_data"]["selected_id"] = selected_id
         
-        # Ask for confirmation to delete the payment
-        await update.message.reply_text(
-            Messages.CONFIRM_DELETE_PAYMENT.format(payment=selected_payment_text),
-            reply_markup=Keyboards.get_confirm_keyboard()
-        )
+        # Get the selected payment details
+        payments = context.user_data["edit_data"].get("payments", [])
+        selected_payment = None
+        for payment in payments:
+            if payment.get("id") == selected_id:
+                selected_payment = payment
+                break
         
-        # Move to the next state: confirm delete
-        return CONFIRM_DELETE
+        if not selected_payment:
+            # If the payment is not found, show error message
+            await update.message.reply_text(
+                Messages.PAYMENT_NOT_FOUND,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
         
+        # Save the selected payment in the context
+        context.user_data["edit_data"]["selected_payment"] = selected_payment
+        
+        # Get the option (delete)
+        option = context.user_data["edit_data"].get("option")
+        
+        if option == "🗑️ Eliminar Pagos":
+            # For deleting, ask for confirmation
+            from_member_name = selected_payment.get("from_member_name", "Desconocido")
+            to_member_name = selected_payment.get("to_member_name", "Desconocido")
+            amount = selected_payment.get("amount", 0)
+            
+            await update.message.reply_text(
+                Messages.CONFIRM_DELETE_PAYMENT.format(
+                    details=f"*De:* {from_member_name}\n"
+                           f"*Para:* {to_member_name}\n"
+                           f"*Monto:* ${amount:.2f}"
+                ),
+                parse_mode="Markdown",
+                reply_markup=Keyboards.get_confirmation_keyboard()
+            )
+            return CONFIRM_DELETE
+            
+        else:
+            # If the option is not recognized, show error message
+            await update.message.reply_text(
+                Messages.INVALID_EDIT_OPTION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
+            
     except Exception as e:
         # Handle unexpected errors
         print(f"Error en handle_select_payment: {str(e)}")
@@ -493,10 +573,10 @@ async def handle_select_payment(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handles the confirmation for deleting an expense or payment.
+    Handles the confirmation of deleting an expense or payment.
     
-    This function processes the user's confirmation response and deletes
-    the selected expense or payment if confirmed.
+    This function processes the user's confirmation and deletes the
+    selected expense or payment if confirmed.
     
     Args:
         update (Update): Telegram Update object
@@ -507,12 +587,13 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
     """
     try:
         # Get the confirmation response
-        confirmation = update.message.text
+        response = update.message.text
         
-        # Check if the user canceled the operation
-        if confirmation != "✅ Confirmar":
+        # Check if the user confirmed
+        if response != "✅ Confirmar":
+            # If not confirmed, show cancel message and return to main menu
             await update.message.reply_text(
-                Messages.OPERATION_CANCELED,
+                Messages.CANCEL_OPERATION,
                 reply_markup=Keyboards.get_main_menu_keyboard()
             )
             return ConversationHandler.END
@@ -524,20 +605,20 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
         if not selected_id:
             # If the ID is not found, show error message
             await update.message.reply_text(
-                Messages.ITEM_NOT_FOUND,
+                "No se encontró el ID del elemento a eliminar.",
                 reply_markup=Keyboards.get_main_menu_keyboard()
             )
             return ConversationHandler.END
         
         # Handle different delete options
-        if option == "🗑️ Eliminar Gasto":
+        if option == "🗑️ Eliminar Gastos":
             # Delete the expense
             status_code, response = ExpenseService.delete_expense(selected_id)
             
             if status_code in [200, 204]:
                 # If the deletion was successful, show success message
                 await update.message.reply_text(
-                    Messages.EXPENSE_DELETED_SUCCESS,
+                    Messages.SUCCESS_EXPENSE_DELETED,
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
             else:
@@ -548,14 +629,14 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
                 
-        elif option == "🗑️ Eliminar Pago":
+        elif option == "🗑️ Eliminar Pagos":
             # Delete the payment
             status_code, response = PaymentService.delete_payment(selected_id)
             
             if status_code in [200, 204]:
                 # If the deletion was successful, show success message
                 await update.message.reply_text(
-                    Messages.PAYMENT_DELETED_SUCCESS,
+                    Messages.SUCCESS_PAYMENT_DELETED,
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
             else:
@@ -565,7 +646,14 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
                     f"Error al eliminar el pago: {error_message}",
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
-        
+                
+        else:
+            # If the option is not recognized, show error message
+            await update.message.reply_text(
+                Messages.INVALID_EDIT_OPTION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            
         # End the conversation
         return ConversationHandler.END
         
