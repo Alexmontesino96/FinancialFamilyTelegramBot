@@ -118,7 +118,7 @@ async def get_expense_description(update: Update, context: ContextTypes.DEFAULT_
         
         # Pedir el monto del gasto
         await update.message.reply_text(
-            Messages.ASK_EXPENSE_AMOUNT,
+            Messages.CREATE_EXPENSE_AMOUNT.format(description=description),
             parse_mode="Markdown",
             reply_markup=Keyboards.get_cancel_keyboard()
         )
