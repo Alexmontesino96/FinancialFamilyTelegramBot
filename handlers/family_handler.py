@@ -10,6 +10,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 from ui.messages import Messages
 from ui.formatters import Formatters
+from ui.keyboards import Keyboards
 from services.family_service import FamilyService
 from utils.context_manager import ContextManager
 from utils.helpers import send_error, create_qr_code
@@ -126,11 +127,12 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Mostrar los balances al usuario
         await update.message.reply_text(
             Messages.BALANCES_HEADER + formatted_balances,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=Keyboards.get_main_menu_keyboard()
         )
         
-        # Mostrar el menú principal
-        return await _show_menu(update, context)
+        # Ya hemos mostrado el menú principal con los balances, finalizar
+        return ConversationHandler.END
         
     except Exception as e:
         # Manejo de errores inesperados
