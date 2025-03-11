@@ -41,16 +41,22 @@ class PaymentService:
         )
     
     @staticmethod
-    def get_family_payments(family_id):
+    def get_family_payments(family_id, telegram_id=None):
         """Obtiene los pagos de una familia.
         
         Args:
             family_id: ID de la familia
+            telegram_id: ID de Telegram del usuario para autenticación (opcional)
             
         Returns:
             tuple: (status_code, response)
         """
-        return ApiService.request("GET", f"/families/{family_id}/payments", check_status=False)
+        return ApiService.request(
+            "GET", 
+            f"/payments/family/{family_id}", 
+            token=telegram_id,
+            check_status=False
+        )
     
     @staticmethod
     def delete_payment(payment_id):
