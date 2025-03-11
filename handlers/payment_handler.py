@@ -415,11 +415,9 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Crear el pago a través del servicio
             status_code, response_data = PaymentService.create_payment(
-                family_id=family_id,
-                amount=amount,
                 from_member=from_member_id,
                 to_member=to_member_id,
-                telegram_id=telegram_id
+                amount=amount
             )
             
             if status_code in [200, 201]:
