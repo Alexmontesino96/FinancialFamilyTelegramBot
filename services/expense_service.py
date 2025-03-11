@@ -17,7 +17,7 @@ class ExpenseService:
     """
     
     @staticmethod
-    def create_expense(description, amount, paid_by, telegram_id=None):
+    def create_expense(description, amount, paid_by, family_id, telegram_id=None):
         """
         Creates a new expense.
         
@@ -25,19 +25,23 @@ class ExpenseService:
             description (str): Description of the expense
             amount (float): Amount of the expense
             paid_by (str): ID of the member who paid
+            family_id (str): ID of the family
             telegram_id (str, optional): Telegram ID of the user creating the expense
             
         Returns:
             tuple: (status_code, response)
         """
         try:
-            print(f"Creando gasto: description={description}, amount={amount}, paid_by={paid_by}, telegram_id={telegram_id}")
+            print(f"Creando gasto: description={description}, amount={amount}, paid_by={paid_by}, family_id={family_id}, telegram_id={telegram_id}")
             data = {
                 "description": description,
                 "amount": amount,
-                "paid_by": paid_by
+                "paid_by": paid_by,
+                "family_id": family_id
             }
-            status_code, response = ApiService.request("POST", "/expenses", data, token=telegram_id, check_status=False)
+            # Construir endpoint con el ID de familia
+            endpoint = f"/families/{family_id}/expenses"
+            status_code, response = ApiService.request("POST", endpoint, data, token=telegram_id, check_status=False)
             print(f"Resultado de create_expense: status_code={status_code}, response={response}")
             
             # Verificar si la respuesta es válida
