@@ -185,14 +185,14 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             button_text = member_name
             if debt_amount > 0:
-                # Si le debes dinero, destacarlo claramente con emojis adicionales
-                button_text = f"💸 {member_name} 💸\nDEBES: ${debt_amount:.2f}"
+                # Si le debes dinero, mostrar solo el nombre y la cantidad
+                button_text = f"{member_name}\nDeuda: ${debt_amount:.2f}"
             elif credit_amount > 0:
-                # Si te debe dinero
-                button_text = f"💰 {member_name} 💰\nTE DEBE: ${credit_amount:.2f}"
+                # Si te debe dinero, también simplificado
+                button_text = f"{member_name}\nTe debe: ${credit_amount:.2f}"
             else:
-                # Incluso sin saldo, mostrar un formato consistente
-                button_text = f"{member_name}\nSALDO: $0.00"
+                # Formato consistente sin saldo
+                button_text = f"{member_name}\nSaldo: $0.00"
                 
             member_buttons.append([button_text])
         
@@ -251,16 +251,12 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         other_members = context.user_data.get("payment_data", {}).get("other_members", [])
         
         # Extraer solo el nombre del miembro del texto seleccionado
-        # El formato puede ser "Nombre\nSALDO: $0.00" o "💸 Nombre 💸\nDEBES: $XX.XX" o "💰 Nombre 💰\nTE DEBE: $XX.XX"
+        # El nuevo formato es "Nombre\nDeuda: $XX.XX" o "Nombre\nTe debe: $XX.XX" o "Nombre\nSaldo: $0.00"
         member_name = selected_text
         
         # Quitar toda la información adicional después del salto de línea
         if "\n" in member_name:
             member_name = member_name.split("\n")[0]
-            
-        # Quitar emojis si los hay
-        if "💸" in member_name or "💰" in member_name:
-            member_name = member_name.replace("💸 ", "").replace(" 💸", "").replace("💰 ", "").replace(" 💰", "")
         
         # Buscar el miembro por nombre
         selected_member = None
