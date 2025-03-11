@@ -269,7 +269,15 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Si el usuario confirma, crear el gasto
             description = expense_data.get("description")
             amount = expense_data.get("amount")
-            paid_by = expense_data.get("paid_by")
+            
+            # Obtener el ID del miembro que paga - puede estar en member_id (clave inicial)
+            member_id = expense_data.get("member_id")
+            paid_by = expense_data.get("paid_by", member_id)  # Usar member_id como fallback
+            
+            # Asegurar que tengamos un paid_by válido
+            if not paid_by and member_id:
+                paid_by = member_id
+            
             family_id = expense_data.get("family_id")
             telegram_id = expense_data.get("telegram_id")
             
