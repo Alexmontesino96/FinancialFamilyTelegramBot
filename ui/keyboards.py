@@ -8,11 +8,11 @@ class Keyboards:
         """Devuelve el teclado del menú principal."""
         keyboard = [
             ["💰 Ver Balances", "💸 Crear Gasto"],
-            ["📋 Ver Gastos", "💳 Registrar Pago"],
+            ["📜 Listar Registros", "💳 Registrar Pago"],
             ["✏️ Editar/Eliminar", "ℹ️ Info Familia"],
             ["🔗 Compartir Invitación"]
         ]
-        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     
     @staticmethod
     def get_edit_options_keyboard():
@@ -45,6 +45,15 @@ class Keyboards:
     def get_cancel_keyboard():
         """Devuelve el teclado con solo la opción de cancelar."""
         keyboard = [["❌ Cancelar"]]
+        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    
+    @staticmethod
+    def get_list_options_keyboard():
+        """Devuelve el teclado con opciones para listar gastos o pagos."""
+        keyboard = [
+            ["📋 Listar Gastos", "📊 Listar Pagos"],
+            ["↩️ Volver al Menú"]
+        ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
     
     @staticmethod

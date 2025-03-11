@@ -7,7 +7,7 @@ from the menu, routing them to the appropriate handlers.
 
 from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, ConversationHandler
-from config import DESCRIPTION, AMOUNT, CONFIRM, SELECT_TO_MEMBER, PAYMENT_AMOUNT, PAYMENT_CONFIRM
+from config import DESCRIPTION, AMOUNT, CONFIRM, SELECT_TO_MEMBER, PAYMENT_AMOUNT, PAYMENT_CONFIRM, LIST_OPTION
 from ui.keyboards import Keyboards
 from ui.messages import Messages
 from ui.formatters import Formatters
@@ -174,6 +174,80 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
+async def show_list_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Muestra las opciones para listar registros.
+    
+    Esta función presenta al usuario un submenú para elegir entre
+    listar gastos o listar pagos.
+    
+    Args:
+        update (Update): Objeto Update de Telegram
+        context (ContextTypes.DEFAULT_TYPE): Contexto de Telegram
+        
+    Returns:
+        int: El siguiente estado de la conversación
+    """
+    try:
+        await update.message.reply_text(
+            "📜 *Listar Registros*\n\n¿Qué registros quieres consultar?",
+            reply_markup=Keyboards.get_list_options_keyboard(),
+            parse_mode="Markdown"
+        )
+        return LIST_OPTION
+    except Exception as e:
+        print(f"Error en show_list_options: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        await update.message.reply_text(
+            "Error al mostrar las opciones de listado. Por favor, intenta de nuevo.",
+            reply_markup=Keyboards.get_main_menu_keyboard()
+        )
+        return ConversationHandler.END
+
+async def handle_list_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Procesa la selección del usuario en el submenú de listado.
+    
+    Args:
+        update (Update): Objeto Update de Telegram
+        context (ContextTypes.DEFAULT_TYPE): Contexto de Telegram
+        
+    Returns:
+        int: El siguiente estado de la conversación
+    """
+    try:
+        # Obtener la opción seleccionada
+        option = update.message.text
+        
+        # Procesar según la opción
+        if option == "📋 Listar Gastos":
+            from handlers.expense_handler import listar_gastos
+            return await listar_gastos(update, context)
+        elif option == "📊 Listar Pagos":
+            from handlers.payment_handler import listar_pagos
+            return await listar_pagos(update, context)
+        elif option == "↩️ Volver al Menú":
+            await show_main_menu(update, context)
+            return ConversationHandler.END
+        else:
+            await update.message.reply_text(
+                "Opción no válida. Por favor, selecciona una opción del menú:",
+                reply_markup=Keyboards.get_list_options_keyboard()
+            )
+            return LIST_OPTION
+    except Exception as e:
+        print(f"Error en handle_list_option: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        await update.message.reply_text(
+            "Error al procesar la opción seleccionada. Por favor, intenta de nuevo.",
+            reply_markup=Keyboards.get_main_menu_keyboard()
+        )
+        return ConversationHandler.END
+
 async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handles the main menu options selected by the user.
@@ -227,14 +301,19 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Iniciar el flujo de creación de gastos
         return await crear_gasto(update, context)
     elif option == "📋 Ver Gastos":
-        # Mostrar la lista de gastos de la familia
+        # OBSOLETO: Ahora se usa Listar Registros > Listar Gastos
+        # Mantenemos por compatibilidad
         return await listar_gastos(update, context)
     elif option == "💳 Registrar Pago":
         # Iniciar el flujo de registro de pagos
         return await registrar_pago(update, context)
     elif option == "📊 Ver Pagos":
-        # Mostrar la lista de pagos de la familia
+        # OBSOLETO: Ahora se usa Listar Registros > Listar Pagos
+        # Mantenemos por compatibilidad
         return await listar_pagos(update, context)
+    elif option == "📜 Listar Registros":
+        # Mostrar el submenú de listar registros
+        return await show_list_options(update, context)
     elif option == "💰 Ver Balances":
         # Mostrar los balances entre miembros de la familia
         return await show_balances(update, context)

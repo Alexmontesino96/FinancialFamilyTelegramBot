@@ -32,6 +32,7 @@ from config import (
     SELECT_PAYMENT,
     CONFIRM_DELETE,
     EDIT_EXPENSE_AMOUNT,
+    LIST_OPTION,
     logger
 )
 from handlers.start_handler import (
@@ -46,7 +47,9 @@ from handlers.start_handler import (
 from handlers.menu_handler import (
     handle_menu_option,
     handle_unknown_text,
-    show_main_menu
+    show_main_menu,
+    show_list_options,
+    handle_list_option
 )
 from handlers.expense_handler import (
     get_expense_description,
@@ -61,7 +64,9 @@ from handlers.payment_handler import (
     get_payment_amount,
     show_payment_confirmation,
     confirm_payment,
-    registrar_pago
+    registrar_pago,
+    update_keyboard,
+    listar_pagos
 )
 from handlers.family_handler import (
     show_balances,
@@ -137,6 +142,18 @@ def main():
     # Register global error handler
     register_error_handlers(application)
     
+    # Añadir el comando para iniciar el chat
+    application.add_handler(CommandHandler("start", start))
+    
+    # Añadir comando para mostrar el menú principal
+    application.add_handler(CommandHandler("menu", show_main_menu))
+    
+    # Añadir comando para actualizar el teclado
+    application.add_handler(CommandHandler("teclado", update_keyboard))
+    
+    # Añadir comando para ver pagos directamente
+    application.add_handler(CommandHandler("pagos", listar_pagos))
+    
     # Manejador para el flujo de creación de familia
     family_handler = ConversationHandler(
         entry_points=[
@@ -203,9 +220,23 @@ def main():
     )
     application.add_handler(payment_handler)
     
+    # Manejador para el flujo de listar registros
+    list_handler = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.Regex("^📜 Listar Registros$"), show_list_options),
+        ],
+        states={
+            LIST_OPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_list_option)]
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+        name="list_conversation",
+        persistent=False
+    )
+    application.add_handler(list_handler)
+    
     # Manejador para opciones del menú principal
     menu_handler = MessageHandler(
-        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|🔗 Compartir Invitación)$"),
+        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación|✏️ Editar/Eliminar|💳 Registrar Pago|💸 Crear Gasto|📜 Listar Registros)$"),
         handle_menu_option
     )
     application.add_handler(menu_handler)

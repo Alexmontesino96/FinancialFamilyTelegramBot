@@ -50,4 +50,14 @@ EDIT_OPTION = 10      # State for selecting edit option (expense or payment)
 SELECT_EXPENSE = 11   # State for selecting which expense to edit/delete
 SELECT_PAYMENT = 12   # State for selecting which payment to edit/delete
 CONFIRM_DELETE = 13   # State for confirming deletion
+EDIT_EXPENSE_AMOUNT = 14  # State for editing expense amount
+
+# List flow - Listing records
+LIST_OPTION = 15      # State for selecting what to list (expenses or payments)
+
+# Edit/Delete flow - Modifying or removing records
+EDIT_OPTION = 10      # State for selecting edit option (expense or payment)
+SELECT_EXPENSE = 11   # State for selecting which expense to edit/delete
+SELECT_PAYMENT = 12   # State for selecting which payment to edit/delete
+CONFIRM_DELETE = 13   # State for confirming deletion
 EDIT_EXPENSE_AMOUNT = 14  # State for editing expense amount 
