@@ -20,12 +20,12 @@ class PaymentService:
         data = {
             "from_member": from_member,
             "to_member": to_member,
-            "amount": amount
+            "amount": amount,
+            "family_id": family_id
         }
         
-        # Usar el endpoint específico de la familia
-        endpoint = f"/families/{family_id}/payments"
-        return ApiService.request("POST", endpoint, data, token=telegram_id, check_status=False)
+        # Usar el endpoint correcto para pagos
+        return ApiService.request("POST", "/payments", data, token=telegram_id, check_status=False)
     
     @staticmethod
     def get_family_payments(family_id):
