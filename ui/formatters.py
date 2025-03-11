@@ -217,15 +217,15 @@ class Formatters:
     def format_balances(balances, member_names=None):
         """Formatea los balances para mostrar en Telegram según el esquema de la API.
         
-        La API puede devolver los balances en dos formatos diferentes:
-        1. Lista de balances por miembro con deudas y créditos detallados
-        2. Lista de transacciones pendientes entre miembros
+        La API devuelve los balances en formato de lista de balances por miembro
+        con deudas y créditos detallados.
         
         Args:
-            balances: Lista de balances o transacciones
-            member_names: Diccionario de ID -> nombre para mostrar nombres en lugar de IDs
+            balances: Lista de balances de miembros
+            member_names: Diccionario de ID -> nombre (opcional, ya que los nombres 
+                          vienen incluidos en la respuesta de la API)
         """
-        print(f"Formateando balances: {balances}")
+        print(f"Formateando balances")
         
         # Si no hay balances, mostrar un mensaje
         if not balances:
@@ -234,49 +234,22 @@ class Formatters:
         # Si no se proporciona el diccionario de nombres, crear uno vacío
         if member_names is None:
             member_names = {}
-            
-        print(f"Nombres de miembros disponibles: {member_names}")
         
-        # Determinar el formato de los balances
-        if isinstance(balances, list) and len(balances) > 0:
-            # Verificar si es el formato 1 (balances por miembro)
-            if isinstance(balances[0], dict) and "member_id" in balances[0]:
+        # Determinar el formato de los balances por la presencia de campos específicos
+        if isinstance(balances, list) and len(balances) > 0 and isinstance(balances[0], dict):
+            if "member_id" in balances[0] and "debts" in balances[0] and "credits" in balances[0]:
                 return Formatters._format_member_balances(balances, member_names)
-            # Verificar si es el formato 2 (transacciones pendientes)
-            elif isinstance(balances[0], dict) and "from_member" in balances[0] and "to_member" in balances[0]:
-                return Formatters._format_pending_transactions(balances, member_names)
         
-        # Si no se puede determinar el formato, mostrar los datos en bruto
-        print(f"Formato de balances no reconocido: {balances}")
-        return f"Datos de balances en formato no reconocido: {balances}"
+        # Si no se puede determinar el formato, mostrar mensaje de error
+        print(f"Formato de balances no reconocido")
+        return "Formato de balances no reconocido. Por favor contacte al administrador."
     
     @staticmethod
     def _format_member_balances(balances, member_names):
         """Formatea los balances por miembro."""
         result = []
         
-        print(f"Formateando balances de miembros con nombres: {member_names}")
-        
-        # Crear un diccionario para mapear diferentes formatos de ID a nombres
-        id_mapping = {}
-        
-        # Procesar el diccionario member_names para crear mapeos adicionales
-        for member_id, name in member_names.items():
-            # Guardar el mapeo original
-            id_mapping[member_id] = name
-            
-            # Guardar también el formato "Usuario X"
-            id_mapping[f"Usuario {member_id}"] = name
-            
-            # Intentar convertir a número si es posible (para IDs numéricos)
-            try:
-                if isinstance(member_id, str) and member_id.isdigit():
-                    numeric_id = int(member_id)
-                    id_mapping[numeric_id] = name
-            except (ValueError, TypeError):
-                pass
-        
-        print(f"Mapeo extendido de IDs a nombres: {id_mapping}")
+        print(f"Formateando balances de miembros")
         
         for balance in balances:
             try:
@@ -285,52 +258,16 @@ class Formatters:
                     print(f"Error: balance no es un diccionario, es {type(balance)}")
                     continue
                 
-                # Obtener el ID del miembro (puede ser string o int)
-                member_id = balance.get('member_id', 'Desconocido')
+                # Obtener el nombre del miembro directamente del balance
+                member_name = balance.get('name', 'Desconocido')
                 
-                # Buscar el nombre del miembro en el diccionario extendido
-                member_name = balance.get('name')  # Primero intentar obtenerlo directamente del balance
-                
-                if not member_name:
-                    # Buscar en nuestro diccionario extendido
-                    member_name = id_mapping.get(member_id)
-                    
-                    # Si no lo encontramos como está, intentar como string
-                    if not member_name and member_id is not None:
-                        member_name = id_mapping.get(str(member_id))
-                    
-                    # Si aún no lo encontramos, buscar si hay un mapeo para "Usuario {member_id}"
-                    if not member_name and member_id is not None:
-                        member_name = id_mapping.get(f"Usuario {member_id}")
-                
-                # Si aún no tenemos un nombre, usar un valor predeterminado
-                if not member_name:
-                    member_name = f"Usuario {member_id}"
-                
-                print(f"Miembro ID: {member_id}, Nombre encontrado: {member_name}")
-                    
                 # Formatear deudas (lo que debe a otros)
                 debts = balance.get('debts', [])
                 if debts and len(debts) > 0 and isinstance(debts, list):
                     debts_list = []
                     for d in debts:
-                        to_id = d.get('to', 'Desconocido')
-                        
-                        # Buscar el nombre del acreedor en nuestro diccionario extendido
-                        to_name = id_mapping.get(to_id)
-                        
-                        # Si no lo encontramos como está, intentar como string
-                        if not to_name and to_id is not None:
-                            to_name = id_mapping.get(str(to_id))
-                        
-                        # Si aún no lo encontramos, buscar en el formato "Usuario X"
-                        if not to_name and to_id is not None:
-                            to_name = id_mapping.get(f"Usuario {to_id}")
-                        
-                        # Si aún no tenemos un nombre, usar un valor predeterminado
-                        if not to_name:
-                            to_name = f"Usuario {to_id}"
-                            
+                        # Obtener el nombre del acreedor directamente del campo 'to'
+                        to_name = d.get('to', 'Desconocido')
                         debts_list.append(f"• Debe a {to_name}: ${d.get('amount', 0):.2f}")
                     debts_text = "\n".join(debts_list)
                 else:
@@ -341,23 +278,8 @@ class Formatters:
                 if credits and len(credits) > 0 and isinstance(credits, list):
                     credits_list = []
                     for c in credits:
-                        from_id = c.get('from', 'Desconocido')
-                        
-                        # Buscar el nombre del deudor en nuestro diccionario extendido
-                        from_name = id_mapping.get(from_id)
-                        
-                        # Si no lo encontramos como está, intentar como string
-                        if not from_name and from_id is not None:
-                            from_name = id_mapping.get(str(from_id))
-                        
-                        # Si aún no lo encontramos, buscar en el formato "Usuario X"
-                        if not from_name and from_id is not None:
-                            from_name = id_mapping.get(f"Usuario {from_id}")
-                        
-                        # Si aún no tenemos un nombre, usar un valor predeterminado
-                        if not from_name:
-                            from_name = f"Usuario {from_id}"
-                            
+                        # Obtener el nombre del deudor directamente del campo 'from'
+                        from_name = c.get('from', 'Desconocido')
                         credits_list.append(f"• Le debe {from_name}: ${c.get('amount', 0):.2f}")
                     credits_text = "\n".join(credits_list)
                 else:
@@ -384,89 +306,10 @@ class Formatters:
                 result.append(member_text)
             except Exception as e:
                 print(f"Error al formatear balance: {e}")
-                import traceback
-                traceback.print_exc()
                 continue
         
-        # Si no hay balances formateados, mostrar un mensaje
+        # Si no hay resultados, mostrar un mensaje
         if not result:
-            return "No hay balances disponibles para mostrar."
-        
-        return "\n\n" + "\n\n".join(result)
-    
-    @staticmethod
-    def _format_pending_transactions(transactions, member_names):
-        """Formatea las transacciones pendientes entre miembros."""
-        if not transactions:
-            return "No hay transacciones pendientes."
-            
-        # Crear un diccionario para mapear diferentes formatos de ID a nombres
-        id_mapping = {}
-        
-        # Procesar el diccionario member_names para crear mapeos adicionales
-        for member_id, name in member_names.items():
-            # Guardar el mapeo original
-            id_mapping[member_id] = name
-            
-            # Guardar también el formato "Usuario X"
-            id_mapping[f"Usuario {member_id}"] = name
-            
-            # Intentar convertir a número si es posible (para IDs numéricos)
-            try:
-                if isinstance(member_id, str) and member_id.isdigit():
-                    numeric_id = int(member_id)
-                    id_mapping[numeric_id] = name
-            except (ValueError, TypeError):
-                pass
-        
-        print(f"Mapeo extendido de IDs a nombres para transacciones: {id_mapping}")
-        
-        result = []
-        for transaction in transactions:
-            try:
-                from_id = transaction.get('from_member', 'Desconocido')
-                to_id = transaction.get('to_member', 'Desconocido')
-                amount = transaction.get('amount', 0)
-                
-                # Buscar el nombre del pagador en el diccionario extendido
-                from_name = id_mapping.get(from_id)
-                
-                # Si no lo encontramos como está, intentar como string
-                if not from_name and from_id is not None:
-                    from_name = id_mapping.get(str(from_id))
-                
-                # Si aún no lo encontramos, buscar en el formato "Usuario X"
-                if not from_name and from_id is not None:
-                    from_name = id_mapping.get(f"Usuario {from_id}")
-                
-                # Si aún no tenemos un nombre, usar un valor predeterminado
-                if not from_name:
-                    from_name = f"Usuario {from_id}"
-                
-                # Buscar el nombre del receptor en el diccionario extendido
-                to_name = id_mapping.get(to_id)
-                
-                # Si no lo encontramos como está, intentar como string
-                if not to_name and to_id is not None:
-                    to_name = id_mapping.get(str(to_id))
-                
-                # Si aún no lo encontramos, buscar en el formato "Usuario X"
-                if not to_name and to_id is not None:
-                    to_name = id_mapping.get(f"Usuario {to_id}")
-                
-                # Si aún no tenemos un nombre, usar un valor predeterminado
-                if not to_name:
-                    to_name = f"Usuario {to_id}"
-                
-                transaction_text = f"💸 *{from_name}* debe pagar *${amount:.2f}* a *{to_name}*"
-                result.append(transaction_text)
-            except Exception as e:
-                print(f"Error al formatear transacción: {e}")
-                import traceback
-                traceback.print_exc()
-                continue
-                
-        if not result:
-            return "No hay transacciones pendientes para mostrar."
+            return "No hay balances disponibles."
             
         return "\n\n".join(result) 

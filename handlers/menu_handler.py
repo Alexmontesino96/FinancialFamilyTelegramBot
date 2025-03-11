@@ -104,40 +104,13 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         if amount > 0:
                                             credits.append({"name": from_name, "amount": amount})
                         
-                        elif "from_member" in balances[0] and "to_member" in balances[0]:
-                            # Formato de transacciones
-                            for transaction in balances:
-                                if str(transaction.get("from_member")) == str(member_id):
-                                    to_id = transaction.get("to_member")
-                                    amount = transaction.get("amount", 0)
-                                    to_name = member_names.get(str(to_id), f"Usuario {to_id}")
-                                    if amount > 0:
-                                        debts.append({"name": to_name, "amount": amount})
-                                
-                                elif str(transaction.get("to_member")) == str(member_id):
-                                    from_id = transaction.get("from_member")
-                                    amount = transaction.get("amount", 0)
-                                    from_name = member_names.get(str(from_id), f"Usuario {from_id}")
-                                    if amount > 0:
-                                        credits.append({"name": from_name, "amount": amount})
-                        
                         else:
-                            # Formato antiguo
-                            for balance in balances:
-                                if isinstance(balance, dict):
-                                    if str(balance.get("debtor_id")) == str(member_id):
-                                        creditor_id = balance.get("creditor_id")
-                                        amount = balance.get("amount", 0)
-                                        creditor_name = member_names.get(str(creditor_id), f"Usuario {creditor_id}")
-                                        if amount > 0:
-                                            debts.append({"name": creditor_name, "amount": amount})
-                                    
-                                    elif str(balance.get("creditor_id")) == str(member_id):
-                                        debtor_id = balance.get("debtor_id")
-                                        amount = balance.get("amount", 0)
-                                        debtor_name = member_names.get(str(debtor_id), f"Usuario {debtor_id}")
-                                        if amount > 0:
-                                            credits.append({"name": debtor_name, "amount": amount})
+                            # Formato no reconocido
+                            print(f"Formato de balances no reconocido: {balances}")
+                            await update.message.reply_text(
+                                "❌ Error: Formato de balances no reconocido. Contacte al administrador."
+                            )
+                            return ConversationHandler.END
                     
                     # Crear resumen de balances para mostrar en la parte inferior
                     if debts or credits:
