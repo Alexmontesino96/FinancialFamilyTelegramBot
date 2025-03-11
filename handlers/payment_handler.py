@@ -238,6 +238,8 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Obtener el texto completo seleccionado (puede incluir información de saldo)
         selected_text = update.message.text
         
+        print(f"Texto seleccionado: {selected_text}")
+        
         # Verificar si el usuario canceló la operación
         if selected_text == "❌ Cancelar":
             await update.message.reply_text(
@@ -249,6 +251,7 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Recuperar los datos previamente guardados en el contexto
         other_members = context.user_data.get("payment_data", {}).get("other_members", [])
+        print(f"Miembros disponibles: {other_members}")
         
         # Extraer solo el nombre del miembro del texto seleccionado
         # El nuevo formato es "Nombre\nDeuda: $XX.XX" o "Nombre\nTe debe: $XX.XX" o "Nombre\nSaldo: $0.00"

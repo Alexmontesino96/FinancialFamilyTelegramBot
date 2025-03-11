@@ -110,7 +110,12 @@ class ContextManager:
                 member_id = member.get("id")
                 member_name = member.get("name", "Unknown")
                 if member_id:
-                    member_names[member_id] = member_name
+                    # Asegurarnos de que los IDs se guarden como strings
+                    member_names[str(member_id)] = member_name
+                    # También guardar el mismo valor con el ID como integer, para compatibilidad
+                    if isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
+                        numeric_id = int(member_id) if isinstance(member_id, str) else member_id
+                        member_names[numeric_id] = member_name
             
             # Save the member names dictionary in the context
             context.user_data["member_names"] = member_names
