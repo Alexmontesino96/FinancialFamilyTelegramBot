@@ -185,14 +185,14 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             button_text = member_name
             if debt_amount > 0:
-                # Si le debes dinero, mostrar solo el nombre y la cantidad
-                button_text = f"{member_name}\nDeuda: ${debt_amount:.2f}"
+                # Si le debes dinero, formato simplificado con flecha
+                button_text = f"{member_name.upper()} -> ${debt_amount:.2f}"
             elif credit_amount > 0:
                 # Si te debe dinero, también simplificado
-                button_text = f"{member_name}\nTe debe: ${credit_amount:.2f}"
+                button_text = f"{member_name.upper()} <- ${credit_amount:.2f}"
             else:
                 # Formato consistente sin saldo
-                button_text = f"{member_name}\nSaldo: $0.00"
+                button_text = f"{member_name.upper()} $0.00"
                 
             member_buttons.append([button_text])
         
