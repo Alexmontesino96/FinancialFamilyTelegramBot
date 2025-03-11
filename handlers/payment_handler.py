@@ -441,11 +441,11 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return ConversationHandler.END
             
             # Crear el pago a través del servicio
+            print(f"Creando pago: from={from_member_id}, to={to_member_id}, amount={amount}, telegram_id={telegram_id}")
             status_code, response_data = PaymentService.create_payment(
                 from_member=from_member_id,
                 to_member=to_member_id,
                 amount=amount,
-                family_id=family_id,
                 telegram_id=telegram_id
             )
             

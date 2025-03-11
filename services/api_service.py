@@ -18,7 +18,7 @@ class ApiService:
     """
     
     @staticmethod
-    def request(method, endpoint, data=None, token=None, check_status=True):
+    def request(method, endpoint, data=None, token=None, params=None, check_status=True):
         """
         Makes an HTTP request to the API.
         
@@ -27,6 +27,7 @@ class ApiService:
             endpoint (str): API endpoint
             data (dict, optional): Data to send in the request
             token (str, optional): Authentication token or Telegram ID
+            params (dict, optional): Query parameters to include in the request
             check_status (bool, optional): If True, raises an exception if status code indicates error
             
         Returns:
@@ -45,27 +46,29 @@ class ApiService:
             # Configurar headers para JSON
             headers = {'Content-Type': 'application/json'}
             
+            # Inicializar parámetros de consulta
+            request_params = params or {}
+            
             # Añadir identificación si está disponible
             # En lugar de usar un token JWT, simplemente pasamos el ID de Telegram
             # como un parámetro de consulta o en los datos
-            params = {}
             if token and isinstance(token, str):
                 # Usar el token como ID de Telegram en un parámetro de consulta
-                params['telegram_id'] = token
+                request_params['telegram_id'] = token
                 logger.debug(f"Including telegram_id={token} in request")
             
             if method == "GET":
-                response = requests.get(url, params=params, headers=headers, timeout=15)
+                response = requests.get(url, params=request_params, headers=headers, timeout=15)
             elif method == "POST":
                 # Para solicitudes POST, solo incluir el telegram_id en los parámetros de consulta
                 # y no duplicarlo en el cuerpo de la solicitud
-                response = requests.post(url, json=data, params=params, headers=headers, timeout=15)
+                response = requests.post(url, json=data, params=request_params, headers=headers, timeout=15)
             elif method == "PUT":
                 # Para solicitudes PUT, solo incluir el telegram_id en los parámetros de consulta
                 # y no duplicarlo en el cuerpo de la solicitud
-                response = requests.put(url, json=data, params=params, headers=headers, timeout=15)
+                response = requests.put(url, json=data, params=request_params, headers=headers, timeout=15)
             elif method == "DELETE":
-                response = requests.delete(url, params=params, headers=headers, timeout=15)
+                response = requests.delete(url, params=request_params, headers=headers, timeout=15)
             else:
                 logger.error(f"Unsupported HTTP method: {method}")
                 return 400, {"error": f"Unsupported HTTP method: {method}"}
@@ -122,4 +125,4 @@ class ApiService:
         Returns:
             tuple: (status_code, response_data)
         """
-        return ApiService.request(method, endpoint, data, token, check_status)
+        return ApiService.request(method, endpoint, data, token, None, check_status)
