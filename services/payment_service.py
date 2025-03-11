@@ -4,13 +4,15 @@ class PaymentService:
     """Servicio para interactuar con pagos."""
     
     @staticmethod
-    def create_payment(from_member, to_member, amount):
+    def create_payment(from_member, to_member, amount, family_id, telegram_id=None):
         """Crea un nuevo pago.
         
         Args:
             from_member: ID del miembro que realiza el pago
             to_member: ID del miembro que recibe el pago
             amount: Monto del pago
+            family_id: ID de la familia
+            telegram_id: ID de Telegram del usuario (opcional)
             
         Returns:
             tuple: (status_code, response)
@@ -21,7 +23,9 @@ class PaymentService:
             "amount": amount
         }
         
-        return ApiService.request("POST", "/payments", data, check_status=False)
+        # Usar el endpoint específico de la familia
+        endpoint = f"/families/{family_id}/payments"
+        return ApiService.request("POST", endpoint, data, token=telegram_id, check_status=False)
     
     @staticmethod
     def get_family_payments(family_id):
