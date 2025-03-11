@@ -36,12 +36,11 @@ class ExpenseService:
             data = {
                 "description": description,
                 "amount": amount,
-                "paid_by": paid_by,
-                "family_id": family_id
+                "paid_by": paid_by
             }
-            # Construir endpoint con el ID de familia
-            endpoint = f"/families/{family_id}/expenses"
-            status_code, response = ApiService.request("POST", endpoint, data, token=telegram_id, check_status=False)
+            # Usar el endpoint correcto de la API
+            endpoint = "/expenses"
+            status_code, response = ApiService.request("POST", endpoint, data, token=telegram_id, params={"telegram_id": telegram_id}, check_status=False)
             print(f"Resultado de create_expense: status_code={status_code}, response={response}")
             
             # Verificar si la respuesta es válida
