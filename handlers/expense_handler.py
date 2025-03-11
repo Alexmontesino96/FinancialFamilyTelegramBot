@@ -244,10 +244,11 @@ async def show_expense_confirmation(update: Update, context: ContextTypes.DEFAUL
 
 async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handles the user's confirmation response for creating an expense.
+    Handles the user's confirmation of a new expense.
     
-    This function processes the user's confirmation and creates the expense
-    in the database if confirmed, or cancels the operation if rejected.
+    This function processes the user's confirmation or cancellation of 
+    an expense creation operation. If confirmed, it creates a new expense
+    in the database.
     
     Args:
         update (Update): Telegram Update object
@@ -260,27 +261,40 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Obtener la respuesta del usuario (confirmar o cancelar)
         response = update.message.text.strip()
         
+        # Obtener los datos del gasto del contexto
+        expense_data = context.user_data.get("expense_data", {})
+        
+        # Procesar según la respuesta
         if response == "✅ Confirmar":
-            # Si el usuario confirma, obtener los datos del gasto
-            expense_data = context.user_data.get("expense_data", {})
-            description = expense_data.get("description", "")
-            amount = expense_data.get("amount", 0)
-            member_id = expense_data.get("member_id")
+            # Si el usuario confirma, crear el gasto
+            description = expense_data.get("description")
+            amount = expense_data.get("amount")
+            paid_by = expense_data.get("paid_by")
+            family_id = expense_data.get("family_id")
             telegram_id = expense_data.get("telegram_id")
             
-            # Crear el gasto en la base de datos a través del servicio
-            status_code, response_data = ExpenseService.create_expense(
+            # Verificar que tenemos todos los datos necesarios
+            if not all([description, amount, paid_by, family_id]):
+                await update.message.reply_text(
+                    "Faltan datos para crear el gasto. Por favor, inténtalo de nuevo.",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+            
+            # Crear el gasto a través del servicio
+            status_code, response = ExpenseService.create_expense(
                 description=description,
                 amount=amount,
-                paid_by=member_id,
+                paid_by=paid_by,
+                family_id=family_id,
                 telegram_id=telegram_id
             )
             
+            # Procesar según el resultado
             if status_code in [200, 201]:
-                # Si la creación fue exitosa, mostrar mensaje de éxito
+                # Si se creó correctamente, mostrar mensaje de éxito
                 await update.message.reply_text(
                     Messages.SUCCESS_EXPENSE_CREATED,
-                    parse_mode="Markdown",
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
                 
@@ -288,15 +302,22 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "expense_data" in context.user_data:
                     del context.user_data["expense_data"]
                 
-                # Mostrar el menú principal
-                return await _show_menu(update, context)
-            else:
-                # Si hubo un error en la creación, mostrar mensaje de error
-                error_message = response_data.get("error", "Error desconocido")
-                await send_error(update, context, f"Error al crear el gasto: {error_message}")
+                # Finalizar conversación
                 return ConversationHandler.END
+            else:
+                # Si hubo un error, mostrar el mensaje de error
+                error_message = "Error desconocido"
+                if isinstance(response, dict) and "detail" in response:
+                    error_message = response["detail"]
+                
+                await update.message.reply_text(
+                    f"❌ Error al crear el gasto: {error_message}",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+        
         elif response == "❌ Cancelar":
-            # Si el usuario elige cancelar explícitamente
+            # Si el usuario cancela, mostrar mensaje de cancelación
             await update.message.reply_text(
                 Messages.CANCEL_OPERATION,
                 reply_markup=Keyboards.get_main_menu_keyboard()
@@ -306,21 +327,22 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "expense_data" in context.user_data:
                 del context.user_data["expense_data"]
             
-            # Mostrar el menú principal
-            return await _show_menu(update, context)
+            # Finalizar conversación
+            return ConversationHandler.END
+        
         else:
-            # Si la respuesta no es reconocida
+            # Si la respuesta no es reconocida, pedir que seleccione una opción válida
             await update.message.reply_text(
-                "Opción no reconocida. Por favor, selecciona Confirmar o Cancelar.",
+                "Por favor, selecciona 'Confirmar' o 'Cancelar'.",
                 reply_markup=Keyboards.get_confirmation_keyboard()
             )
             return CONFIRM
-            
+        
     except Exception as e:
         # Manejo de errores inesperados
         print(f"Error en confirm_expense: {str(e)}")
         traceback.print_exc()
-        await send_error(update, context, "Ocurrió un error al confirmar el gasto.")
+        await send_error(update, context, f"Error al confirmar el gasto: {str(e)}")
         return ConversationHandler.END
 
 async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):

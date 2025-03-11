@@ -123,26 +123,35 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         balances_dict = {}  # Lo que otros te deben a ti
         debts_dict = {}     # Lo que tú debes a otros
         
-        # Crear diccionario de ID a nombres para facilitar referencias
-        member_id_to_name = {m.get("id"): m.get("name", "Desconocido") for m in members}
+        # Crear diccionario de nombres a IDs para facilitar referencias
+        name_to_id = {m.get("name"): m.get("id") for m in members}
+        id_to_name = {m.get("id"): m.get("name", "Desconocido") for m in members}
         
         if status_code == 200 and balances:
             # Buscamos los balances específicos para el usuario actual
             for balance in balances:
-                # Si este balance corresponde al usuario actual
+                # Si este balance corresponde al usuario actual (comparando ID)
                 if str(balance.get("member_id")) == str(from_member_id):
                     # Procesar sus deudas (lo que debe a otros)
                     for debt in balance.get("debts", []):
-                        to_id = debt.get("to")
+                        to_name = debt.get("to")
                         amount = debt.get("amount", 0)
-                        if amount > 0:
+                        
+                        # Obtenemos el ID correspondiente al nombre
+                        to_id = name_to_id.get(to_name)
+                        
+                        if amount > 0 and to_id:
                             debts_dict[str(to_id)] = amount
                             
                     # Procesar sus créditos (lo que otros le deben)
                     for credit in balance.get("credits", []):
-                        from_id = credit.get("from")
+                        from_name = credit.get("from")
                         amount = credit.get("amount", 0)
-                        if amount > 0:
+                        
+                        # Obtenemos el ID correspondiente al nombre
+                        from_id = name_to_id.get(from_name)
+                        
+                        if amount > 0 and from_id:
                             balances_dict[str(from_id)] = amount
                     
                     # Una vez encontrado el balance del usuario, podemos salir del bucle
@@ -159,7 +168,7 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if debts_dict:
             deudas_lista = []
             for creditor_id, amount in debts_dict.items():
-                creditor_name = member_id_to_name.get(creditor_id, f"Usuario {creditor_id}")
+                creditor_name = id_to_name.get(creditor_id, f"Usuario {creditor_id}")
                 deudas_lista.append(f"• Debes ${amount:.2f} a {creditor_name}")
             deudas_mensaje = "📊 *Resumen de tus deudas:*\n" + "\n".join(deudas_lista) + "\n\n"
         
@@ -467,13 +476,15 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "Faltan datos para crear el pago. Por favor, inténtalo de nuevo.",
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
-                return await _show_menu(update, context)
+                return ConversationHandler.END
             
             # Crear el pago a través del servicio
             status_code, response_data = PaymentService.create_payment(
                 from_member=from_member_id,
                 to_member=to_member_id,
-                amount=amount
+                amount=amount,
+                family_id=family_id,
+                telegram_id=telegram_id
             )
             
             if status_code in [200, 201]:
@@ -488,13 +499,13 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "payment_data" in context.user_data:
                     del context.user_data["payment_data"]
                 
-                # Volver al menú principal
-                return await _show_menu(update, context)
+                # Finalizar conversación
+                return ConversationHandler.END
             else:
                 # Si hubo un error al crear el pago, mostrar mensaje de error
                 error_message = response_data.get("error", "Error desconocido")
                 await send_error(update, context, f"Error al registrar el pago: {error_message}")
-                return await _show_menu(update, context)
+                return ConversationHandler.END
         elif response == "❌ Cancelar":
             # Si el usuario cancela, mostrar mensaje y volver al menú principal
             await update.message.reply_text(
@@ -506,8 +517,8 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "payment_data" in context.user_data:
                 del context.user_data["payment_data"]
             
-            # Volver al menú principal
-            return await _show_menu(update, context)
+            # Finalizar conversación
+            return ConversationHandler.END
         else:
             # Si la respuesta no es reconocida
             await update.message.reply_text(
@@ -520,4 +531,4 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Manejo de errores inesperados
         print(f"Error en confirm_payment: {str(e)}")
         await send_error(update, context, f"Error al confirmar el pago: {str(e)}")
-        return await _show_menu(update, context) 
+        return ConversationHandler.END 
