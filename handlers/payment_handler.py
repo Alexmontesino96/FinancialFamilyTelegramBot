@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from config import SELECT_TO_MEMBER, PAYMENT_AMOUNT, PAYMENT_CONFIRM
 from ui.keyboards import Keyboards
 from ui.messages import Messages
+from ui.formatters import Formatters
 from services.payment_service import PaymentService
 from services.family_service import FamilyService
 from services.member_service import MemberService
@@ -489,4 +490,155 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     except Exception as e:
         await send_error(update, context, f"Error al confirmar el pago: {str(e)}")
+        return ConversationHandler.END
+
+async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Muestra la lista de pagos de la familia.
+    
+    Esta función recupera todos los pagos de la familia actual y los muestra
+    al usuario en un formato ordenado.
+    
+    Args:
+        update (Update): Objeto Update de Telegram
+        context (ContextTypes.DEFAULT_TYPE): Contexto de Telegram
+        
+    Returns:
+        int: El siguiente estado de la conversación
+    """
+    try:
+        # Obtener el ID de Telegram del usuario
+        telegram_id = str(update.effective_user.id)
+        
+        # Enviar mensaje de carga
+        message = await update.message.reply_text(
+            Messages.LOADING,
+            reply_markup=Keyboards.remove_keyboard()
+        )
+        
+        # Obtener el ID de la familia desde el contexto
+        family_id = context.user_data.get("family_id")
+        
+        # Si no tenemos el ID de familia en el contexto, intentar obtenerlo desde la API
+        if not family_id:
+            status_code, member = MemberService.get_member(telegram_id)
+            if status_code == 200 and member and member.get("family_id"):
+                family_id = member.get("family_id")
+                context.user_data["family_id"] = family_id
+            else:
+                await message.edit_text(
+                    Messages.ERROR_NOT_IN_FAMILY,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+        
+        # Obtener los pagos de la familia
+        status_code, payments = PaymentService.get_family_payments(family_id, telegram_id)
+        
+        # Si hubo un error al obtener los pagos, mostrar mensaje de error
+        if status_code != 200 or not payments:
+            error_message = payments.get("error", "Error desconocido") if isinstance(payments, dict) else "No se encontraron pagos"
+            await message.edit_text(
+                Messages.ERROR_NO_PAYMENTS,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
+        
+        # Verificar si hay pagos para mostrar
+        if len(payments) == 0:
+            await message.edit_text(
+                Messages.NO_PAYMENTS,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
+        
+        # Cargar los nombres de los miembros si no están en el contexto
+        member_names = context.user_data.get("member_names", {})
+        if not member_names:
+            # Cargar los nombres de los miembros desde la API
+            status_code, family = FamilyService.get_family(family_id, telegram_id)
+            if status_code == 200 and family and "members" in family:
+                # Crear un diccionario para mapear IDs a nombres de miembros
+                for member in family.get("members", []):
+                    member_id = member.get("id")
+                    member_name = member.get("name", f"Usuario {member_id}")
+                    # Guardar tanto como string como de forma numérica si corresponde
+                    member_names[str(member_id)] = member_name
+                    if isinstance(member_id, (int, float)) or (isinstance(member_id, str) and member_id.isdigit()):
+                        member_names[int(member_id) if isinstance(member_id, str) else member_id] = member_name
+                
+                # Guardar en el contexto para uso futuro
+                context.user_data["member_names"] = member_names
+        
+        # Construir mensaje con la lista de pagos
+        message_text = Messages.PAYMENTS_LIST_HEADER
+        
+        # Ordenar pagos por fecha (más recientes primero)
+        from datetime import datetime
+        
+        # Intentamos ordenar por fecha si está disponible
+        try:
+            sorted_payments = sorted(
+                payments, 
+                key=lambda x: datetime.fromisoformat(x.get("created_at").replace("Z", "+00:00")), 
+                reverse=True
+            )
+        except (AttributeError, ValueError):
+            # Si hay un error al ordenar, usar la lista original
+            sorted_payments = payments
+        
+        # Limitar a 10 pagos para no hacer el mensaje demasiado largo
+        limited_payments = sorted_payments[:10]
+        
+        # Construir el mensaje con los pagos
+        for payment in limited_payments:
+            # Los miembros ahora son objetos completos, no solo IDs
+            from_member = payment.get("from_member", {})
+            to_member = payment.get("to_member", {})
+            
+            # Obtener información del miembro que realiza el pago
+            from_id = from_member.get("id") if isinstance(from_member, dict) else from_member
+            from_name = from_member.get("name") if isinstance(from_member, dict) else member_names.get(str(from_id), f"Usuario {from_id}")
+            
+            # Obtener información del miembro que recibe el pago
+            to_id = to_member.get("id") if isinstance(to_member, dict) else to_member
+            to_name = to_member.get("name") if isinstance(to_member, dict) else member_names.get(str(to_id), f"Usuario {to_id}")
+            
+            amount = payment.get("amount", 0)
+            date = payment.get("created_at", "Fecha desconocida")
+            
+            # Formatear la fecha si es posible
+            try:
+                date_obj = datetime.fromisoformat(date.replace("Z", "+00:00"))
+                formatted_date = date_obj.strftime("%d/%m/%Y %H:%M")
+            except (ValueError, AttributeError):
+                formatted_date = date
+            
+            # Añadir este pago al mensaje
+            message_text += Messages.PAYMENT_LIST_ITEM.format(
+                id=payment.get("id", "ID desconocido"),
+                from_member=from_name,
+                to_member=to_name,
+                amount=f"${amount:.2f}",
+                date=formatted_date
+            )
+        
+        # Si hay más pagos de los que mostramos, añadir un mensaje indicándolo
+        if len(sorted_payments) > 10:
+            message_text += f"\n_Mostrando los 10 pagos más recientes de {len(sorted_payments)} en total._"
+        
+        # Mostrar el mensaje con la lista de pagos
+        await message.edit_text(
+            message_text,
+            reply_markup=Keyboards.get_main_menu_keyboard(),
+            parse_mode="Markdown"
+        )
+        
+        return ConversationHandler.END
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        await send_error(update, context, f"Error al mostrar los pagos: {str(e)}")
+        await _show_menu(update, context)
         return ConversationHandler.END 
