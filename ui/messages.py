@@ -76,12 +76,27 @@ class Messages:
         "----------------------------\n\n"
     )
     
-    # Mensajes para gastos no encontrados
+    # Mensajes para listar pagos
+    PAYMENTS_LIST_HEADER = "💳 *Lista de Pagos*\n\n"
+    
+    PAYMENT_LIST_ITEM = (
+        "*ID:* `{id}`\n"
+        "*De:* {from_member}\n"
+        "*Para:* {to_member}\n"
+        "*Monto:* {amount}\n"
+        "*Fecha:* {date}\n"
+        "----------------------------\n\n"
+    )
+    
+    # Mensajes para gastos y pagos no encontrados
     NO_EXPENSES = "📋 No hay gastos registrados en esta familia."
+    NO_PAYMENTS = "💳 No hay pagos registrados en esta familia."
     
     # Mensajes de flujo de pagos
     CREATE_PAYMENT_INTRO = "💳 Vamos a registrar un nuevo pago.\n\n" \
                           "¿A quién le estás pagando?"
+    
+    NO_DEBTS = "✅ *¡Felicidades!* En este momento no tienes deudas pendientes con ningún miembro de tu familia."
     
     SELECT_PAYMENT_RECIPIENT = "💳 ¿A quién le estás pagando? Selecciona un miembro de tu familia:"
     

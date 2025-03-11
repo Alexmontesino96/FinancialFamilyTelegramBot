@@ -156,6 +156,14 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 creditor_name = id_to_name.get(creditor_id, f"Usuario {creditor_id}")
                 deudas_lista.append(f"• Debes ${amount:.2f} a {creditor_name}")
             deudas_mensaje = "📊 *Resumen de tus deudas:*\n" + "\n".join(deudas_lista) + "\n\n"
+        else:
+            # Si el usuario no tiene deudas, mostrar mensaje y regresar al menú principal
+            await update.message.reply_text(
+                Messages.NO_DEBTS,
+                parse_mode="Markdown",
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
         
         # Crear teclado con los nombres de los miembros
         member_buttons = []
@@ -641,4 +649,34 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         traceback.print_exc()
         await send_error(update, context, f"Error al mostrar los pagos: {str(e)}")
         await _show_menu(update, context)
+        return ConversationHandler.END
+
+# Función para forzar la actualización del teclado
+async def update_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Fuerza la actualización del teclado del menú principal.
+    
+    Esta función es útil cuando hay problemas de visualización del teclado.
+    
+    Args:
+        update (Update): Objeto Update de Telegram
+        context (ContextTypes.DEFAULT_TYPE): Contexto de Telegram
+        
+    Returns:
+        int: El siguiente estado de la conversación
+    """
+    try:
+        await update.message.reply_text(
+            "Actualizando teclado...",
+            reply_markup=Keyboards.remove_keyboard()
+        )
+        
+        await update.message.reply_text(
+            Messages.MAIN_MENU,
+            reply_markup=Keyboards.get_main_menu_keyboard()
+        )
+        
+        return ConversationHandler.END
+    except Exception as e:
+        await send_error(update, context, f"Error al actualizar el teclado: {str(e)}")
         return ConversationHandler.END 
