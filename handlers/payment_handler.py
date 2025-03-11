@@ -560,18 +560,32 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Si hubo un error al obtener los pagos, mostrar mensaje de error
         if status_code != 200 or not payments:
             error_message = payments.get("error", "Error desconocido") if isinstance(payments, dict) else "No se encontraron pagos"
-            await message.edit_text(
-                Messages.ERROR_NO_PAYMENTS,
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
+            try:
+                await message.edit_text(
+                    Messages.ERROR_NO_PAYMENTS,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+            except Exception as edit_error:
+                # Si hay un error al editar el mensaje, enviamos uno nuevo
+                await update.message.reply_text(
+                    Messages.ERROR_NO_PAYMENTS,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
             return ConversationHandler.END
         
         # Verificar si hay pagos para mostrar
         if len(payments) == 0:
-            await message.edit_text(
-                Messages.NO_PAYMENTS,
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
+            try:
+                await message.edit_text(
+                    Messages.NO_PAYMENTS,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+            except Exception as edit_error:
+                # Si hay un error al editar el mensaje, enviamos uno nuevo
+                await update.message.reply_text(
+                    Messages.NO_PAYMENTS,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
             return ConversationHandler.END
         
         # Cargar los nombres de los miembros si no están en el contexto
@@ -650,11 +664,19 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message_text += f"\n_Mostrando los 10 pagos más recientes de {len(sorted_payments)} en total._"
         
         # Mostrar el mensaje con la lista de pagos
-        await message.edit_text(
-            message_text,
-            reply_markup=Keyboards.get_main_menu_keyboard(),
-            parse_mode="Markdown"
-        )
+        try:
+            await message.edit_text(
+                message_text,
+                reply_markup=Keyboards.get_main_menu_keyboard(),
+                parse_mode="Markdown"
+            )
+        except Exception as edit_error:
+            # Si hay un error al editar el mensaje, enviamos uno nuevo
+            await update.message.reply_text(
+                message_text,
+                reply_markup=Keyboards.get_main_menu_keyboard(),
+                parse_mode="Markdown"
+            )
         
         return ConversationHandler.END
         
