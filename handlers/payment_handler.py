@@ -168,26 +168,41 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Crear teclado con los nombres de los miembros
         member_buttons = []
         
+        # Filtrar miembros para mostrar solo aquellos a los que el usuario debe dinero
+        members_with_debt = []
+        
         for member in other_members:
             member_id = str(member.get("id"))
             member_name = member.get("name", "Desconocido")
             
-            # Verificar saldos
+            # Verificar si hay deuda pendiente con este miembro
             debt_amount = debts_dict.get(member_id, 0)
-            credit_amount = balances_dict.get(member_id, 0)
             
-            # Formato simplificado usando flechas para indicar dirección del dinero
+            # Solo considerar miembros a los que se les debe dinero
             if debt_amount > 0:
+                members_with_debt.append({
+                    "id": member_id,
+                    "name": member_name,
+                    "debt_amount": debt_amount
+                })
                 button_text = f"{member_name.upper()} -> ${debt_amount:.2f}"
-            elif credit_amount > 0:
-                button_text = f"{member_name.upper()} <- ${credit_amount:.2f}"
-            else:
-                button_text = f"{member_name.upper()} $0.00"
-                
-            member_buttons.append([button_text])
+                member_buttons.append([button_text])
+        
+        # Verificar si después del filtrado queda algún miembro para mostrar
+        if not members_with_debt:
+            # Caso especial: hay deudas pero no con los miembros actuales de la familia
+            await update.message.reply_text(
+                "No se encontraron miembros en tu familia a los que debas dinero actualmente.",
+                parse_mode="Markdown",
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
         
         # Agregar botón de cancelar
         member_buttons.append(["❌ Cancelar"])
+        
+        # Guardar la lista filtrada de miembros con deuda para uso futuro
+        context.user_data["payment_data"]["members_with_debt"] = members_with_debt
         
         # Mostrar mensaje para seleccionar el destinatario del pago
         await update.message.reply_text(
@@ -235,27 +250,34 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _show_menu(update, context)
             return ConversationHandler.END
         
-        # Recuperar los datos previamente guardados en el contexto
-        other_members = context.user_data.get("payment_data", {}).get("other_members", [])
+        # Recuperar la lista filtrada de miembros con deuda
+        members_with_debt = context.user_data.get("payment_data", {}).get("members_with_debt", [])
         
         # Extraer solo el nombre del miembro del texto seleccionado
-        # El formato es "NOMBRE -> $XX.XX" o "NOMBRE <- $XX.XX" o "NOMBRE $0.00"
+        # El formato es "NOMBRE -> $XX.XX"
         parts = selected_text.split(" ")
         member_name = parts[0]
         
         # Buscar el miembro por nombre (ignorando mayúsculas/minúsculas)
         selected_member = None
-        for member in other_members:
+        for member in members_with_debt:
             if member.get("name").upper() == member_name:
                 selected_member = member
                 break
         
         if not selected_member:
             # Si no se encuentra el miembro, mostrar error y volver a pedir
+            buttons = []
+            for member in members_with_debt:
+                debt_amount = member.get("debt_amount", 0)
+                button_text = f"{member.get('name').upper()} -> ${debt_amount:.2f}"
+                buttons.append([button_text])
+            buttons.append(["❌ Cancelar"])
+            
             await update.message.reply_text(
                 f"Miembro '{member_name}' no encontrado. Por favor, selecciona un miembro de la lista:",
                 reply_markup=ReplyKeyboardMarkup(
-                    [[m.get("name", "Desconocido")] for m in other_members] + [["❌ Cancelar"]],
+                    buttons,
                     one_time_keyboard=True,
                     resize_keyboard=True
                 )
@@ -265,25 +287,17 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Guardar el ID del miembro destinatario en el contexto
         to_member_id = selected_member.get("id")
         to_member_name = selected_member.get("name")
+        debt_amount = selected_member.get("debt_amount", 0)
         context.user_data["payment_data"]["to_member_id"] = to_member_id
         context.user_data["payment_data"]["to_member_name"] = to_member_name
+        context.user_data["payment_data"]["debt_amount"] = debt_amount
         
-        # Verificar si hay saldos registrados para este miembro
-        balances = context.user_data.get("payment_data", {}).get("balances", {})
-        debts = context.user_data.get("payment_data", {}).get("debts", {})
-        
-        # Obtener montos (si existen)
-        credit_amount = balances.get(str(to_member_id), 0)  # Lo que te debe
-        debt_amount = debts.get(str(to_member_id), 0)       # Lo que le debes
-        
-        # Pedir el monto del pago con la información adecuada
+        # Preparar el mensaje para pedir el monto del pago
         message_text = Messages.CREATE_PAYMENT_AMOUNT.format(to_member=to_member_name)
         
-        # Simplificar el mensaje para mostrar una indicación clara sin advertencias extensas
-        if debt_amount > 0:
-            message_text += f"\n\n💡 Deuda actual: ${debt_amount:.2f}"
-        elif credit_amount > 0:
-            message_text += f"\n\n💡 Te debe: ${credit_amount:.2f}"
+        # Añadir la deuda actual y sugerir ese monto para el pago
+        message_text += f"\n\n💡 Deuda actual: ${debt_amount:.2f}"
+        message_text += f"\n\n💰 *Sugerencia:* Puedes escribir \"{debt_amount:.2f}\" para pagar la deuda completa."
         
         await update.message.reply_text(
             message_text,

@@ -98,7 +98,7 @@ class Messages:
     
     NO_DEBTS = "✅ *¡Felicidades!* En este momento no tienes deudas pendientes con ningún miembro de tu familia."
     
-    SELECT_PAYMENT_RECIPIENT = "💳 ¿A quién le estás pagando? Selecciona un miembro de tu familia:"
+    SELECT_PAYMENT_RECIPIENT = "💳 ¿A quién le quieres pagar? Selecciona un miembro de tu familia al que le debas dinero:"
     
     CREATE_PAYMENT_AMOUNT = "👍 Destinatario seleccionado: *{to_member}*\n\n" \
                            "Ahora, ¿cuál es el monto del pago? (Ej: 100.50)"
