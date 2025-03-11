@@ -555,7 +555,7 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return ConversationHandler.END
         
         # Obtener los pagos de la familia
-        status_code, payments = PaymentService.get_family_payments(family_id, telegram_id)
+        status_code, payments = PaymentService.get_family_payments(family_id)
         
         # Si hubo un error al obtener los pagos, mostrar mensaje de error
         if status_code != 200 or not payments:
