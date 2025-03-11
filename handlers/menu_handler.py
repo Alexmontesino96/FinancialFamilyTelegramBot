@@ -38,13 +38,162 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Returns:
         int: The next conversation state
     """
-    # Mostrar el mensaje del menú principal con el teclado de opciones
-    await update.message.reply_text(
-        Messages.MAIN_MENU,
-        reply_markup=Keyboards.get_main_menu_keyboard()
-    )
-    # Finalizar la conversación actual para permitir nuevas interacciones
-    return ConversationHandler.END
+    try:
+        # Verificar si tenemos datos de familia y miembro
+        telegram_id = str(update.effective_user.id)
+        family_id = context.user_data.get("family_id")
+        
+        # Si no tenemos el ID de familia, obtenerlo
+        if not family_id:
+            status_code, member = MemberService.get_member(telegram_id)
+            if status_code == 200 and member and member.get("family_id"):
+                family_id = member.get("family_id")
+                context.user_data["family_id"] = family_id
+        
+        # Cargar miembros si no están en el contexto
+        if not context.user_data.get("member_names"):
+            await ContextManager.load_family_members(context, family_id)
+            
+        # Obtener balances para mostrar resumen
+        message_menu = Messages.MAIN_MENU
+        bottom_balance = ""
+        
+        if family_id:
+            # Obtener los balances del usuario
+            status_code, balances = FamilyService.get_family_balances(family_id, telegram_id)
+            
+            if status_code == 200 and balances:
+                member_names = context.user_data.get("member_names", {})
+                
+                # Identificar el ID del miembro actual
+                member_id = None
+                if "family" in context.user_data and "members" in context.user_data["family"]:
+                    for member in context.user_data["family"]["members"]:
+                        if member.get("telegram_id") == telegram_id:
+                            member_id = member.get("id")
+                            break
+                
+                # Si no encontramos el ID de esta manera, buscarlo en la API
+                if not member_id and "family_id" in context.user_data:
+                    status_code, member = MemberService.get_member(telegram_id)
+                    if status_code == 200 and member:
+                        member_id = member.get("id")
+                
+                # Si tenemos el ID del miembro, buscar sus balances
+                if member_id:
+                    debts = []  # Lista para almacenar deudas (lo que debo)
+                    credits = []  # Lista para almacenar créditos (lo que me deben)
+                    
+                    # Procesar según el formato de balances
+                    if isinstance(balances, list) and len(balances) > 0:
+                        if "member_id" in balances[0]:
+                            # Formato detallado
+                            for balance in balances:
+                                if str(balance.get("member_id")) == str(member_id):
+                                    for debt in balance.get("debts", []):
+                                        to_id = debt.get("to")
+                                        amount = debt.get("amount", 0)
+                                        to_name = member_names.get(str(to_id), f"Usuario {to_id}")
+                                        if amount > 0:
+                                            debts.append({"name": to_name, "amount": amount})
+                                    
+                                    for credit in balance.get("credits", []):
+                                        from_id = credit.get("from")
+                                        amount = credit.get("amount", 0)
+                                        from_name = member_names.get(str(from_id), f"Usuario {from_id}")
+                                        if amount > 0:
+                                            credits.append({"name": from_name, "amount": amount})
+                        
+                        elif "from_member" in balances[0] and "to_member" in balances[0]:
+                            # Formato de transacciones
+                            for transaction in balances:
+                                if str(transaction.get("from_member")) == str(member_id):
+                                    to_id = transaction.get("to_member")
+                                    amount = transaction.get("amount", 0)
+                                    to_name = member_names.get(str(to_id), f"Usuario {to_id}")
+                                    if amount > 0:
+                                        debts.append({"name": to_name, "amount": amount})
+                                
+                                elif str(transaction.get("to_member")) == str(member_id):
+                                    from_id = transaction.get("from_member")
+                                    amount = transaction.get("amount", 0)
+                                    from_name = member_names.get(str(from_id), f"Usuario {from_id}")
+                                    if amount > 0:
+                                        credits.append({"name": from_name, "amount": amount})
+                        
+                        else:
+                            # Formato antiguo
+                            for balance in balances:
+                                if isinstance(balance, dict):
+                                    if str(balance.get("debtor_id")) == str(member_id):
+                                        creditor_id = balance.get("creditor_id")
+                                        amount = balance.get("amount", 0)
+                                        creditor_name = member_names.get(str(creditor_id), f"Usuario {creditor_id}")
+                                        if amount > 0:
+                                            debts.append({"name": creditor_name, "amount": amount})
+                                    
+                                    elif str(balance.get("creditor_id")) == str(member_id):
+                                        debtor_id = balance.get("debtor_id")
+                                        amount = balance.get("amount", 0)
+                                        debtor_name = member_names.get(str(debtor_id), f"Usuario {debtor_id}")
+                                        if amount > 0:
+                                            credits.append({"name": debtor_name, "amount": amount})
+                    
+                    # Crear resumen de balances para mostrar en la parte inferior
+                    if debts or credits:
+                        bottom_balance = "\n\n📊 *Resumen de tu balance:*\n"
+                        
+                        # Mostrar deudas (lo que debo)
+                        if debts:
+                            total_debt = sum(debt["amount"] for debt in debts)
+                            bottom_balance += f"💸 *Debes:* ${total_debt:.2f} en total\n"
+                            
+                            # Mostrar detalle de la deuda más grande si hay varias
+                            if len(debts) == 1:
+                                bottom_balance += f"└ A {debts[0]['name']}: ${debts[0]['amount']:.2f}\n"
+                            elif len(debts) > 1:
+                                # Ordenar por monto de mayor a menor
+                                debts.sort(key=lambda x: x["amount"], reverse=True)
+                                bottom_balance += f"└ Mayor deuda con {debts[0]['name']}: ${debts[0]['amount']:.2f}\n"
+                        else:
+                            bottom_balance += "💸 *No debes dinero a nadie*\n"
+                        
+                        # Mostrar créditos (lo que me deben)
+                        if credits:
+                            total_credit = sum(credit["amount"] for credit in credits)
+                            bottom_balance += f"💰 *Te deben:* ${total_credit:.2f} en total\n"
+                            
+                            # Mostrar detalle del crédito más grande si hay varios
+                            if len(credits) == 1:
+                                bottom_balance += f"└ {credits[0]['name']}: ${credits[0]['amount']:.2f}\n"
+                            elif len(credits) > 1:
+                                # Ordenar por monto de mayor a menor
+                                credits.sort(key=lambda x: x["amount"], reverse=True)
+                                bottom_balance += f"└ Mayor crédito de {credits[0]['name']}: ${credits[0]['amount']:.2f}\n"
+                        else:
+                            bottom_balance += "💰 *Nadie te debe dinero*\n"
+        
+        # Mostrar el mensaje del menú principal con el teclado de opciones y resumen de balance
+        await update.message.reply_text(
+            message_menu + bottom_balance,
+            reply_markup=Keyboards.get_main_menu_keyboard(),
+            parse_mode="Markdown"
+        )
+        
+        # Finalizar la conversación actual para permitir nuevas interacciones
+        return ConversationHandler.END
+        
+    except Exception as e:
+        print(f"Error en show_main_menu: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # En caso de error, mostrar solo el menú básico
+        await update.message.reply_text(
+            Messages.MAIN_MENU,
+            reply_markup=Keyboards.get_main_menu_keyboard()
+        )
+        return ConversationHandler.END
 
 async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
