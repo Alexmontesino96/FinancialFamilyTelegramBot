@@ -20,7 +20,7 @@ from utils.helpers import send_error
 
 # Importaciones de otros manejadores para las diferentes opciones del menú
 from handlers.expense_handler import crear_gasto, listar_gastos
-from handlers.payment_handler import registrar_pago
+from handlers.payment_handler import registrar_pago, listar_pagos
 from handlers.family_handler import show_balances, mostrar_info_familia, compartir_invitacion
 from handlers.edit_handler import show_edit_options
 
@@ -49,6 +49,12 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if status_code == 200 and member and member.get("family_id"):
                 family_id = member.get("family_id")
                 context.user_data["family_id"] = family_id
+        
+        # Primero limpiar el teclado para forzar la actualización
+        await update.message.reply_text(
+            "Preparando menú...",
+            reply_markup=Keyboards.remove_keyboard()
+        )
         
         # Cargar miembros si no están en el contexto
         if not context.user_data.get("member_names"):
@@ -226,6 +232,9 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
     elif option == "💳 Registrar Pago":
         # Iniciar el flujo de registro de pagos
         return await registrar_pago(update, context)
+    elif option == "📊 Ver Pagos":
+        # Mostrar la lista de pagos de la familia
+        return await listar_pagos(update, context)
     elif option == "💰 Ver Balances":
         # Mostrar los balances entre miembros de la familia
         return await show_balances(update, context)
