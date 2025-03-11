@@ -80,9 +80,11 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Obtener el ID del miembro que realiza el pago (from_member)
         from_member_id = member.get("id")
+        from_member_name = member.get("name", "Tú")
         
         # Guardar datos iniciales en el contexto
         context.user_data["payment_data"]["from_member_id"] = from_member_id
+        context.user_data["payment_data"]["from_member_name"] = from_member_name
         context.user_data["payment_data"]["family_id"] = family_id
         context.user_data["payment_data"]["telegram_id"] = telegram_id
         
@@ -117,41 +119,104 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status_code, balances = FamilyService.get_family_balances(family_id, telegram_id)
         print(f"Respuesta de get_family_balances: status_code={status_code}, balances={balances}")
         
-        # Crear un diccionario para mapear miembros a sus saldos
-        balances_dict = {}
+        # Crear diccionarios para mapear miembros a sus saldos
+        balances_dict = {}  # Lo que otros te deben a ti
+        debts_dict = {}     # Lo que tú debes a otros
+        
+        # Crear diccionario de ID a nombres para facilitar referencias
+        member_id_to_name = {m.get("id"): m.get("name", "Desconocido") for m in members}
         
         if status_code == 200 and balances:
-            # Procesar los balances para encontrar cuánto debe cada miembro al usuario actual
-            for balance in balances:
-                # El saldo puede estar en diferentes formatos, dependiendo de la API
-                if isinstance(balance, dict):
-                    # Formato más detallado (diccionario con miembros y montos)
-                    # Buscar registros donde el usuario actual es acreedor (tiene que recibir dinero)
-                    if balance.get("creditor_id") == from_member_id:
-                        debtor_id = balance.get("debtor_id")
-                        amount = balance.get("amount", 0)
-                        if debtor_id and amount > 0:
-                            balances_dict[debtor_id] = amount
-                            
-                # Otros formatos posibles de la API podrían procesarse aquí
+            print(f"Procesando balances para el miembro {from_member_id}")
+            
+            # Procesar los balances según su formato
+            if isinstance(balances, list) and len(balances) > 0:
+                # Revisar el formato de balances
+                if "member_id" in balances[0]:
+                    # Formato de balances por miembro
+                    for balance in balances:
+                        # Si este es el balance del usuario actual
+                        if balance.get("member_id") == from_member_id:
+                            # Revisar sus deudas (lo que debe a otros)
+                            for debt in balance.get("debts", []):
+                                to_id = debt.get("to")
+                                amount = debt.get("amount", 0)
+                                if to_id and amount > 0:
+                                    debts_dict[to_id] = amount
+                                    
+                            # Revisar sus créditos (lo que otros le deben)
+                            for credit in balance.get("credits", []):
+                                from_id = credit.get("from")
+                                amount = credit.get("amount", 0)
+                                if from_id and amount > 0:
+                                    balances_dict[from_id] = amount
+                                    
+                elif "from_member" in balances[0] and "to_member" in balances[0]:
+                    # Formato de transacciones pendientes
+                    for transaction in balances:
+                        if transaction.get("from_member") == from_member_id:
+                            # Tú debes a alguien
+                            to_id = transaction.get("to_member")
+                            amount = transaction.get("amount", 0)
+                            if to_id and amount > 0:
+                                debts_dict[to_id] = amount
+                        elif transaction.get("to_member") == from_member_id:
+                            # Alguien te debe a ti
+                            from_id = transaction.get("from_member")
+                            amount = transaction.get("amount", 0)
+                            if from_id and amount > 0:
+                                balances_dict[from_id] = amount
+                else:
+                    # Formato simplificado (usado en versiones anteriores)
+                    for balance in balances:
+                        if isinstance(balance, dict):
+                            # Si el usuario actual es acreedor (tiene que recibir dinero)
+                            if balance.get("creditor_id") == from_member_id:
+                                debtor_id = balance.get("debtor_id")
+                                amount = balance.get("amount", 0)
+                                if debtor_id and amount > 0:
+                                    balances_dict[debtor_id] = amount
+                            # Si el usuario actual es deudor (tiene que pagar)
+                            elif balance.get("debtor_id") == from_member_id:
+                                creditor_id = balance.get("creditor_id")
+                                amount = balance.get("amount", 0)
+                                if creditor_id and amount > 0:
+                                    debts_dict[creditor_id] = amount
         
-        # Guardar la lista de miembros y el diccionario de saldos en el contexto
+        # Guardar datos en el contexto
         context.user_data["payment_data"]["members"] = members
         context.user_data["payment_data"]["other_members"] = other_members
         context.user_data["payment_data"]["balances"] = balances_dict
+        context.user_data["payment_data"]["debts"] = debts_dict
         
-        # Crear teclado con los nombres de los miembros y sus saldos
+        # Primero mostrar un resumen de tus deudas
+        deudas_mensaje = ""
+        if debts_dict:
+            deudas_lista = []
+            for creditor_id, amount in debts_dict.items():
+                creditor_name = member_id_to_name.get(creditor_id, f"Usuario {creditor_id}")
+                deudas_lista.append(f"• Debes ${amount:.2f} a {creditor_name}")
+            deudas_mensaje = "📊 *Resumen de tus deudas:*\n" + "\n".join(deudas_lista) + "\n\n"
+        
+        # Crear teclado con los nombres de los miembros, destacando a quienes les debes
         member_buttons = []
         for member in other_members:
             member_id = member.get("id")
             member_name = member.get("name", "Desconocido")
-            # Verificar si este miembro debe dinero al usuario actual
-            amount_owed = balances_dict.get(member_id, 0)
             
-            # Si el miembro debe dinero, mostrar cuánto debe
+            # Chequear si le debes dinero a este miembro
+            debt_amount = debts_dict.get(member_id, 0)
+            
+            # Chequear si te debe dinero este miembro
+            credit_amount = balances_dict.get(member_id, 0)
+            
             button_text = member_name
-            if amount_owed > 0:
-                button_text = f"{member_name} (Te debe: ${amount_owed:.2f})"
+            if debt_amount > 0:
+                # Si le debes dinero, destacarlo claramente
+                button_text = f"💸 {member_name} (Le debes: ${debt_amount:.2f})"
+            elif credit_amount > 0:
+                # Si te debe dinero
+                button_text = f"💰 {member_name} (Te debe: ${credit_amount:.2f})"
                 
             member_buttons.append([button_text])
             
@@ -160,12 +225,13 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Mostrar mensaje para seleccionar el destinatario del pago
         await update.message.reply_text(
-            Messages.SELECT_PAYMENT_RECIPIENT,
+            deudas_mensaje + Messages.SELECT_PAYMENT_RECIPIENT,
             reply_markup=ReplyKeyboardMarkup(
                 member_buttons, 
                 one_time_keyboard=True,
                 resize_keyboard=True
-            )
+            ),
+            parse_mode="Markdown"
         )
         
         # Pasar al siguiente estado: seleccionar destinatario
@@ -200,31 +266,40 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if selected_text == "❌ Cancelar":
             await update.message.reply_text(
                 Messages.CANCEL_OPERATION,
-                reply_markup=Keyboards.get_main_menu_keyboard()
+                reply_markup=Keyboards.remove_keyboard()
             )
-            # Limpiar los datos del pago del contexto
-            if "payment_data" in context.user_data:
-                del context.user_data["payment_data"]
-            return await _show_menu(update, context)
+            await _show_menu(update, context)
+            return ConversationHandler.END
         
-        # Obtener la lista de otros miembros del contexto
+        # Recuperar los datos previamente guardados en el contexto
         other_members = context.user_data.get("payment_data", {}).get("other_members", [])
         
-        # Extraer solo el nombre del miembro (eliminando la parte de saldo si existe)
-        # El formato es "Nombre (Te debe: $XX.XX)" o simplemente "Nombre"
-        selected_name = selected_text
-        if "(" in selected_text:
-            selected_name = selected_text.split("(")[0].strip()
+        # Extraer solo el nombre del miembro del texto seleccionado
+        # El formato puede ser "Nombre" o "💸 Nombre (Le debes: $XX.XX)" o "💰 Nombre (Te debe: $XX.XX)"
+        member_name = selected_text
         
-        print(f"Texto seleccionado: '{selected_text}', Nombre extraído: '{selected_name}'")
+        # Quitar emojis y paréntesis si los hay
+        if "💸" in member_name or "💰" in member_name:
+            # Quitar emojis
+            member_name = member_name.replace("💸 ", "").replace("💰 ", "")
+            
+            # Quitar la parte entre paréntesis
+            if " (" in member_name:
+                member_name = member_name.split(" (")[0]
         
-        # Buscar el miembro seleccionado por nombre
-        to_member = next((m for m in other_members if m.get("name") == selected_name), None)
+        print(f"Nombre extraído: '{member_name}' del texto seleccionado: '{selected_text}'")
         
-        if not to_member:
+        # Buscar el miembro seleccionado en la lista de miembros
+        selected_member = None
+        for member in other_members:
+            if member.get("name") == member_name:
+                selected_member = member
+                break
+        
+        if not selected_member:
             # Si no se encuentra el miembro, mostrar error y volver a pedir
             await update.message.reply_text(
-                f"Miembro '{selected_name}' no encontrado. Por favor, selecciona un miembro de la lista:",
+                f"Miembro '{member_name}' no encontrado. Por favor, selecciona un miembro de la lista:",
                 reply_markup=ReplyKeyboardMarkup(
                     [[m.get("name", "Desconocido")] for m in other_members] + [["❌ Cancelar"]],
                     one_time_keyboard=True,
@@ -234,16 +309,16 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return SELECT_TO_MEMBER
         
         # Guardar el ID del miembro destinatario en el contexto
-        to_member_id = to_member.get("id")
+        to_member_id = selected_member.get("id")
         context.user_data["payment_data"]["to_member_id"] = to_member_id
-        context.user_data["payment_data"]["to_member_name"] = selected_name
+        context.user_data["payment_data"]["to_member_name"] = member_name
         
         # Verificar si hay un balance registrado para este miembro
         balances = context.user_data.get("payment_data", {}).get("balances", {})
         suggested_amount = balances.get(to_member_id, 0)
         
         # Pedir el monto del pago, sugeriendo el monto adeudado si existe
-        message_text = Messages.CREATE_PAYMENT_AMOUNT.format(to_member=selected_name)
+        message_text = Messages.CREATE_PAYMENT_AMOUNT.format(to_member=member_name)
         if suggested_amount > 0:
             message_text += f"\n\n💡 *Sugerencia:* Este miembro te debe ${suggested_amount:.2f}"
         
@@ -339,28 +414,46 @@ async def show_payment_confirmation(update: Update, context: ContextTypes.DEFAUL
         int: The next conversation state
     """
     try:
-        # Obtener los datos del pago del contexto
-        payment_data = context.user_data.get("payment_data", {})
-        to_member_name = payment_data.get("to_member_name", "Desconocido")
-        amount = payment_data.get("amount", 0)
+        # Verificar que todos los datos necesarios estén en el contexto
+        from_member_id = context.user_data.get("payment_data", {}).get("from_member_id")
+        to_member_id = context.user_data.get("payment_data", {}).get("to_member_id")
+        from_member_name = context.user_data.get("payment_data", {}).get("from_member_name", "Tú")
+        to_member_name = context.user_data.get("payment_data", {}).get("to_member_name")
+        amount = context.user_data.get("payment_data", {}).get("amount")
         
-        # Obtener información sobre el miembro que realiza el pago
-        from_member_id = payment_data.get("from_member_id")
-        from_member_name = "Tú"  # Por defecto
+        if not all([from_member_id, to_member_id, to_member_name, amount]):
+            # Si faltan datos, mostrar error y cancelar
+            print(f"Datos incompletos: from_member_id={from_member_id}, to_member_id={to_member_id}, to_member_name={to_member_name}, amount={amount}")
+            await update.message.reply_text(
+                "Error: Datos incompletos. Por favor, intenta nuevamente.",
+                reply_markup=Keyboards.remove_keyboard()
+            )
+            await _show_menu(update, context)
+            return ConversationHandler.END
         
-        if "members" in payment_data:
-            for member in payment_data.get("members", []):
-                if member.get("id") == from_member_id:
-                    from_member_name = member.get("name", "Tú")
-                    break
+        # Obtener información de deudas
+        debts_dict = context.user_data.get("payment_data", {}).get("debts", {})
+        debt_amount = debts_dict.get(to_member_id, 0)
         
-        # Mostrar mensaje de confirmación con los detalles del pago
+        # Crear mensaje de confirmación
+        confirmation_message = Messages.CREATE_PAYMENT_CONFIRM.format(
+            from_member=from_member_name,
+            to_member=to_member_name,
+            amount=amount
+        )
+        
+        # Añadir información de deuda si existe
+        if debt_amount > 0:
+            if amount >= debt_amount:
+                confirmation_message += f"\n\n✅ Este pago cubrirá tu deuda de ${debt_amount:.2f} con {to_member_name}."
+            else:
+                remaining = debt_amount - amount
+                confirmation_message += f"\n\n⚠️ Este pago cubrirá parcialmente tu deuda de ${debt_amount:.2f} con {to_member_name}.\nQuedarán pendientes ${remaining:.2f}"
+        elif debt_amount == 0 and to_member_id in debts_dict:
+            confirmation_message += f"\n\n✅ No tienes deudas pendientes con {to_member_name}."
+        
         await update.message.reply_text(
-            Messages.CREATE_PAYMENT_CONFIRM.format(
-                from_member=from_member_name,
-                to_member=to_member_name,
-                amount=amount
-            ),
+            confirmation_message,
             parse_mode="Markdown",
             reply_markup=Keyboards.get_confirmation_keyboard()
         )
