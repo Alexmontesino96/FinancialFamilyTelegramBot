@@ -78,8 +78,7 @@ async def start_create_family(update: Update, context: ContextTypes.DEFAULT_TYPE
     print(f"Opción seleccionada: {option}")
     
     if option == "🏠 Crear Familia":
-        # Si el usuario selecciona crear familia, no es necesario verificar si ya está en una
-        # Simplemente iniciamos el flujo de creación
+        # Iniciamos el flujo de creación de familia
         await update.message.reply_text(
             Messages.CREATE_FAMILY_INTRO,
             reply_markup=Keyboards.remove_keyboard()
@@ -93,13 +92,21 @@ async def start_create_family(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return JOIN_FAMILY_CODE
     else:
-        # Si no es ninguna de las opciones anteriores, asumimos que es una respuesta al ASK_FAMILY_CODE
-        # y continuamos con el flujo normal
+        # Si el usuario envía un nombre de familia directamente después de /start,
+        # tratarlo como si hubiera elegido "Crear Familia" y usar ese texto como nombre de familia
+        
+        # Guardar el nombre de familia en el contexto
+        context.user_data["family_name"] = option
+        
+        # Preguntar por el nombre del usuario
         await update.message.reply_text(
-            Messages.CREATE_FAMILY_INTRO,
+            Messages.CREATE_FAMILY_NAME_RECEIVED.format(family_name=option),
+            parse_mode="Markdown",
             reply_markup=Keyboards.remove_keyboard()
         )
-        return ASK_FAMILY_NAME
+        
+        # Pasar al siguiente estado
+        return ASK_USER_NAME
 
 async def ask_user_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Pide el nombre del usuario tras recibir el nombre de la familia."""
