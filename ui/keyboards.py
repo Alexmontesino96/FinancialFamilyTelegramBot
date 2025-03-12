@@ -28,8 +28,8 @@ class Keyboards:
     def get_start_keyboard():
         """Devuelve el teclado inicial con opciones para crear o unirse a una familia."""
         keyboard = [
-            ["🏠 Crear Familia"],
-            ["🔗 Unirse a Familia"]
+            ["🏠 Crear Familia Nueva"],
+            ["🔗 Unirse a Familia Existente"]
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
     
