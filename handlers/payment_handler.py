@@ -128,16 +128,32 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if str(balance.get("member_id")) == str(from_member_id):
                     # Procesar sus deudas (lo que debe a otros)
                     for debt in balance.get("debts", []):
-                        to_id = debt.get("to")
+                        to_name = debt.get("to")
                         amount = debt.get("amount", 0)
-                        if amount > 0:
+                        
+                        # Buscar el ID del miembro por su nombre
+                        to_id = None
+                        for member in members:
+                            if member.get("name") == to_name:
+                                to_id = member.get("id")
+                                break
+                        
+                        if to_id and amount > 0:
                             debts_dict[str(to_id)] = amount
                             
                     # Procesar sus créditos (lo que otros le deben)
                     for credit in balance.get("credits", []):
-                        from_id = credit.get("from")
+                        from_name = credit.get("from")
                         amount = credit.get("amount", 0)
-                        if amount > 0:
+                        
+                        # Buscar el ID del miembro por su nombre
+                        from_id = None
+                        for member in members:
+                            if member.get("name") == from_name:
+                                from_id = member.get("id")
+                                break
+                        
+                        if from_id and amount > 0:
                             balances_dict[str(from_id)] = amount
                     
                     break  # Una vez encontrado el balance del usuario, salimos del bucle
