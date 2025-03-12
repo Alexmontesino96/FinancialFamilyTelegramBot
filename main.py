@@ -161,8 +161,11 @@ def main():
         ],
         states={
             ASK_FAMILY_CODE: [
-                MessageHandler(filters.Regex("^🏠 Crear Familia$"), start_create_family),
-                MessageHandler(filters.Regex("^🔗 Unirse a Familia$"), start_join_family),
+                # Usar patrones más flexibles para los botones
+                MessageHandler(filters.Regex("(?i).*crear.*familia.*|.*🏠.*"), start_create_family),
+                MessageHandler(filters.Regex("(?i).*unirse.*familia.*|.*🔗.*"), start_join_family),
+                # Capturar cualquier otro texto para evitar que se active el unknown_handler
+                MessageHandler(filters.TEXT & ~filters.COMMAND, start_create_family),
             ],
             ASK_FAMILY_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_user_name)],
             ASK_USER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, create_family_with_names)],
@@ -170,6 +173,7 @@ def main():
         },
         fallbacks=[CommandHandler("cancel", cancel)]
     )
+    # Añadir el family_handler al principio para que tenga prioridad
     application.add_handler(family_handler)
     
     # Manejador para el flujo de edición/eliminación
