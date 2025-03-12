@@ -7,7 +7,7 @@ creating new expenses, listing existing expenses, and managing expense data.
 
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
-from config import DESCRIPTION, AMOUNT, CONFIRM
+from config import DESCRIPTION, AMOUNT, CONFIRM, logger
 from ui.keyboards import Keyboards
 from ui.messages import Messages
 from ui.formatters import Formatters
@@ -305,6 +305,66 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     Messages.SUCCESS_EXPENSE_CREATED,
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
+                
+                # Notificar a todos los miembros de la familia sobre el nuevo gasto
+                try:
+                    # Obtener la información completa del gasto creado
+                    expense_id = response.get("id")
+                    created_at = response.get("created_at", "desconocida")
+                    
+                    # Formatear la fecha si está disponible
+                    if isinstance(created_at, str) and "T" in created_at:
+                        date_part = created_at.split("T")[0]
+                        created_at = date_part
+                    
+                    # Obtener el nombre del miembro que pagó
+                    member_names = context.user_data.get("member_names", {})
+                    paid_by_name = member_names.get(str(paid_by), "Desconocido")
+                    
+                    # Obtener la lista de miembros de la familia
+                    logger.info(f"[NOTIFY_EXPENSE] Obteniendo miembros de la familia {family_id} para notificar sobre nuevo gasto")
+                    members_status, members = FamilyService.get_family_members(family_id, token=telegram_id)
+                    
+                    if members_status == 200 and members:
+                        # Formatear el mensaje de notificación
+                        notification_message = (
+                            f"💸 *Nuevo Gasto Registrado*\n\n"
+                            f"*Descripción:* {description}\n"
+                            f"*Monto:* ${amount:.2f}\n"
+                            f"*Pagado por:* {paid_by_name}\n"
+                            f"*Fecha:* {created_at}\n\n"
+                            f"_Gasto registrado en la familia por {update.effective_user.first_name}_"
+                        )
+                        
+                        # Enviar mensaje a cada miembro de la familia
+                        current_user_id = str(update.effective_user.id)
+                        notified_count = 0
+                        
+                        for member in members:
+                            member_telegram_id = member.get("telegram_id")
+                            
+                            # No enviar notificación al usuario que creó el gasto (ya recibió confirmación)
+                            if member_telegram_id and member_telegram_id != current_user_id:
+                                try:
+                                    await context.bot.send_message(
+                                        chat_id=member_telegram_id,
+                                        text=notification_message,
+                                        parse_mode="Markdown"
+                                    )
+                                    notified_count += 1
+                                    logger.info(f"[NOTIFY_EXPENSE] Notificación enviada a miembro {member.get('name')} (ID: {member_telegram_id})")
+                                except Exception as notify_error:
+                                    logger.error(f"[NOTIFY_EXPENSE] Error al notificar a miembro {member_telegram_id}: {str(notify_error)}")
+                        
+                        if notified_count > 0:
+                            logger.info(f"[NOTIFY_EXPENSE] Se notificó a {notified_count} miembros sobre el nuevo gasto")
+                    else:
+                        logger.warning(f"[NOTIFY_EXPENSE] No se pudo obtener la lista de miembros. Status: {members_status}")
+                
+                except Exception as notify_error:
+                    logger.error(f"[NOTIFY_EXPENSE] Error en proceso de notificación: {str(notify_error)}")
+                    traceback.print_exc()
+                    # No bloqueamos el flujo principal si la notificación falla
                 
                 # Limpiar los datos del gasto del contexto
                 if "expense_data" in context.user_data:
