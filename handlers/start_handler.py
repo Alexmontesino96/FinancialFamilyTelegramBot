@@ -7,7 +7,7 @@ family creation, joining existing families, and deep link processing.
 
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
-from config import ASK_FAMILY_CODE, ASK_FAMILY_NAME, ASK_USER_NAME, JOIN_FAMILY_CODE
+from config import ASK_FAMILY_CODE, ASK_FAMILY_NAME, ASK_USER_NAME, JOIN_FAMILY_CODE, logger
 from ui.keyboards import Keyboards
 from ui.messages import Messages
 from services.family_service import FamilyService
@@ -45,17 +45,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Returns:
         int: The next conversation state
     """
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "sin username"
+    logger.info(f"[START] Usuario {user_id} (@{username}) ha ejecutado el comando /start")
+    
     if context.args:  # Si hay argumentos, manejar enlace profundo
+        logger.info(f"[START] Usuario {user_id} tiene argumentos: {context.args}")
         return await handle_deep_link(update, context)
     else:  # Flujo normal de bienvenida
         # Limpiar datos previos para evitar conflictos
         if "family_id" in context.user_data:
+            old_family_id = context.user_data["family_id"]
+            logger.info(f"[START] Eliminando family_id anterior: {old_family_id} del contexto del usuario {user_id}")
             del context.user_data["family_id"]
+        
+        logger.info(f"[START] Mostrando mensaje de bienvenida y teclado de inicio al usuario {user_id}")
+        keyboard = Keyboards.get_start_keyboard()
+        logger.debug(f"[START] Botones del teclado de inicio: {keyboard.keyboard}")
             
         await update.message.reply_text(
             Messages.WELCOME,
-            reply_markup=Keyboards.get_start_keyboard()
+            reply_markup=keyboard
         )
+        
+        logger.info(f"[START] Estableciendo estado ASK_FAMILY_CODE para usuario {user_id}")
         return ASK_FAMILY_CODE
 
 async def start_create_family(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -73,55 +86,84 @@ async def start_create_family(update: Update, context: ContextTypes.DEFAULT_TYPE
     Returns:
         int: The next conversation state
     """
+    user_id = update.effective_user.id
     option = update.message.text
     
-    print(f"Opción seleccionada: {option}")
+    logger.info(f"[CREATE_FAMILY] Usuario {user_id} seleccionó opción: '{option}'")
+    
+    # Comprobar si la opción coincide exactamente con los botones esperados
+    if option == "🏠 Crear Familia":
+        logger.info(f"[CREATE_FAMILY] Coincidencia exacta con 'Crear Familia' para usuario {user_id}")
+    elif option == "🔗 Unirse a Familia":
+        logger.info(f"[CREATE_FAMILY] Coincidencia exacta con 'Unirse a Familia' para usuario {user_id}")
+    else:
+        # Depurar expresiones regulares
+        import re
+        crear_match = re.search("(?i).*crear.*familia.*|.*🏠.*", option)
+        unirse_match = re.search("(?i).*unirse.*familia.*|.*🔗.*", option)
+        
+        if crear_match:
+            logger.info(f"[CREATE_FAMILY] Coincidencia con regex de crear familia: '{option}'")
+        elif unirse_match:
+            logger.info(f"[CREATE_FAMILY] Coincidencia con regex de unirse a familia: '{option}'")
+        else:
+            logger.info(f"[CREATE_FAMILY] Sin coincidencia con expresiones regulares: '{option}'")
     
     if option == "🏠 Crear Familia":
         # Si el usuario selecciona crear familia, no es necesario verificar si ya está en una
         # Simplemente iniciamos el flujo de creación
+        logger.info(f"[CREATE_FAMILY] Iniciando flujo de creación de familia para usuario {user_id}")
         await update.message.reply_text(
             Messages.CREATE_FAMILY_INTRO,
             reply_markup=Keyboards.remove_keyboard()
         )
+        logger.info(f"[CREATE_FAMILY] Estableciendo estado ASK_FAMILY_NAME para usuario {user_id}")
         return ASK_FAMILY_NAME
     elif option == "🔗 Unirse a Familia":
         # En lugar de llamar a start_join_family, configuramos el estado directamente
+        logger.info(f"[CREATE_FAMILY] Iniciando flujo para unirse a familia para usuario {user_id}")
         await update.message.reply_text(
             Messages.JOIN_FAMILY_INTRO,
             reply_markup=Keyboards.remove_keyboard()
         )
+        logger.info(f"[CREATE_FAMILY] Estableciendo estado JOIN_FAMILY_CODE para usuario {user_id}")
         return JOIN_FAMILY_CODE
     else:
         # Si no es ninguna de las opciones anteriores, asumimos que es una respuesta al ASK_FAMILY_CODE
         # y continuamos con el flujo normal
+        logger.info(f"[CREATE_FAMILY] Tratando texto '{option}' como solicitud de crear familia para usuario {user_id}")
         await update.message.reply_text(
             Messages.CREATE_FAMILY_INTRO,
             reply_markup=Keyboards.remove_keyboard()
         )
+        logger.info(f"[CREATE_FAMILY] Estableciendo estado ASK_FAMILY_NAME para usuario {user_id}")
         return ASK_FAMILY_NAME
 
 async def ask_user_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Pide el nombre del usuario tras recibir el nombre de la familia."""
+    user_id = update.effective_user.id
     family_name = update.message.text
     context.user_data["family_name"] = family_name
     
-    print(f"Nombre de familia recibido: {family_name}")
+    logger.info(f"[ASK_USER_NAME] Usuario {user_id} proporcionó nombre de familia: '{family_name}'")
     
     await update.message.reply_text(
         Messages.CREATE_FAMILY_NAME_RECEIVED.format(family_name=family_name),
         parse_mode="Markdown"
     )
+    logger.info(f"[ASK_USER_NAME] Estableciendo estado ASK_USER_NAME para usuario {user_id}")
     return ASK_USER_NAME
 
 async def create_family_with_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Crea la familia con los nombres proporcionados y envía el ID y QR."""
+    user_id = update.effective_user.id
     try:
         user_name = update.message.text
         family_name = context.user_data["family_name"]
         telegram_id = str(update.effective_user.id)
         
-        print(f"Creando familia '{family_name}' con usuario '{user_name}' (telegram_id: {telegram_id})")
+        logger.info(f"[CREATE_FAMILY_WITH_NAMES] Usuario {user_id} proporcionó su nombre: '{user_name}'")
+        logger.info(f"[CREATE_FAMILY_WITH_NAMES] Creando familia '{family_name}' con usuario '{user_name}' (telegram_id: {telegram_id})")
         
         # Crear la familia con el miembro inicial
         status_code, response = FamilyService.create_family(
@@ -132,26 +174,28 @@ async def create_family_with_names(update: Update, context: ContextTypes.DEFAULT
             }]
         )
         
-        print(f"Respuesta de create_family: status_code={status_code}, response={response}")
+        logger.info(f"[CREATE_FAMILY_WITH_NAMES] Respuesta de create_family: status_code={status_code}, response={response}")
         
         if status_code >= 400:
             error_msg = f"❌ Error al crear la familia. Código de error: {status_code}"
             if isinstance(response, dict) and "detail" in response:
                 error_msg += f"\nDetalle: {response['detail']}"
+            logger.error(f"[CREATE_FAMILY_WITH_NAMES] Error al crear familia: {error_msg}")
             await update.message.reply_text(error_msg)
             return ConversationHandler.END
         
         # Obtener el ID de la familia creada
         family_id = response.get("id", "")
-        print(f"ID de familia obtenido: {family_id}")
+        logger.info(f"[CREATE_FAMILY_WITH_NAMES] ID de familia obtenido: {family_id}")
         
         if not family_id:
+            logger.error(f"[CREATE_FAMILY_WITH_NAMES] No se pudo obtener el ID de la familia creada")
             await update.message.reply_text("❌ Error: No se pudo obtener el ID de la familia creada.")
             return ConversationHandler.END
         
         # Guardar que el usuario está en una familia
         context.user_data["family_id"] = family_id
-        print(f"ID de familia guardado en el contexto: {context.user_data['family_id']}")
+        logger.info(f"[CREATE_FAMILY_WITH_NAMES] ID de familia guardado en el contexto: {context.user_data['family_id']}")
         
         # Guardar la información de la familia directamente en el contexto
         # No es necesario cargar los miembros de la API porque ya sabemos que solo hay uno
@@ -174,6 +218,7 @@ async def create_family_with_names(update: Update, context: ContextTypes.DEFAULT
         }
         
         # Enviar mensaje de éxito con el ID
+        logger.info(f"[CREATE_FAMILY_WITH_NAMES] Enviando mensaje de éxito para familia '{family_name}' (ID: {family_id})")
         await update.message.reply_text(
             Messages.SUCCESS_FAMILY_CREATED.format(name=family_name, id=family_id),
             parse_mode="Markdown"
@@ -181,6 +226,7 @@ async def create_family_with_names(update: Update, context: ContextTypes.DEFAULT
         
         # Crear y enviar el código QR
         qr_data = f"https://t.me/{context.bot.username}?start=join_{family_id}"
+        logger.info(f"[CREATE_FAMILY_WITH_NAMES] Generando código QR con URL: {qr_data}")
         qr_image = create_qr_code(qr_data)
         await update.message.reply_photo(
             photo=qr_image,
@@ -188,11 +234,12 @@ async def create_family_with_names(update: Update, context: ContextTypes.DEFAULT
         )
         
         # Mostrar el menú principal
+        logger.info(f"[CREATE_FAMILY_WITH_NAMES] Mostrando menú principal para usuario {user_id}")
         from handlers.menu_handler import show_main_menu
         await show_main_menu(update, context)
 
     except Exception as e:
-        print(f"Error en create_family_with_names: {str(e)}")
+        logger.error(f"[CREATE_FAMILY_WITH_NAMES] Error para usuario {user_id}: {str(e)}")
         traceback.print_exc()
         await send_error(update, context, str(e))
         # No limpiar el contexto para poder depurar
@@ -202,35 +249,41 @@ async def create_family_with_names(update: Update, context: ContextTypes.DEFAULT
 
 async def start_join_family(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Inicia el flujo para unirse a una familia."""
+    user_id = update.effective_user.id
+    logger.info(f"[START_JOIN_FAMILY] Usuario {user_id} inicia flujo para unirse a una familia")
+    
     await update.message.reply_text(
         Messages.JOIN_FAMILY_INTRO,
         reply_markup=Keyboards.remove_keyboard(),
         parse_mode="Markdown"
     )
+    logger.info(f"[START_JOIN_FAMILY] Estableciendo estado JOIN_FAMILY_CODE para usuario {user_id}")
     return JOIN_FAMILY_CODE
 
 async def join_family(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Procesa el código y une al usuario a la familia."""
+    user_id = update.effective_user.id
     family_id = update.message.text.strip()  # Eliminar espacios en blanco
     
-    # Imprimir para depuración
-    print(f"Intentando unirse a la familia con ID: {family_id}")
+    logger.info(f"[JOIN_FAMILY] Usuario {user_id} intenta unirse a la familia con ID: '{family_id}'")
     
     try:
         # Verificar si la familia existe
+        logger.info(f"[JOIN_FAMILY] Verificando si existe la familia con ID: {family_id}")
         status_code, response = FamilyService.get_family(family_id)
         
-        # Imprimir para depuración
-        print(f"Respuesta de get_family: status_code={status_code}, response={response}")
+        logger.info(f"[JOIN_FAMILY] Respuesta de get_family: status_code={status_code}, response={response}")
         
         # Verificar el status code
         if status_code == 404:
+            logger.warning(f"[JOIN_FAMILY] Familia no encontrada con ID: {family_id}")
             await update.message.reply_text(
                 "❌ ID de familia inválido. Por favor, verifica e intenta nuevamente.\n\n"
                 "Debes ingresar el ID exacto que te compartieron."
             )
             return JOIN_FAMILY_CODE  # Mantener el estado para permitir otro intento
         elif status_code >= 400:
+            logger.error(f"[JOIN_FAMILY] Error al verificar familia: código {status_code}")
             await update.message.reply_text(
                 f"❌ Error al verificar la familia. Código de error: {status_code}"
             )
@@ -243,7 +296,7 @@ async def join_family(update: Update, context: ContextTypes.DEFAULT_TYPE):
         telegram_id = str(update.effective_user.id)
         user_name = update.effective_user.first_name
         
-        print(f"Añadiendo usuario {telegram_id} ({user_name}) a la familia {family_id}")
+        logger.info(f"[JOIN_FAMILY] Añadiendo usuario {telegram_id} ({user_name}) a la familia {family_id}")
         
         status_code, add_response = FamilyService.add_member_to_family(
             family_id=family_id,
@@ -251,10 +304,10 @@ async def join_family(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name=user_name
         )
         
-        # Imprimir para depuración
-        print(f"Respuesta de add_member_to_family: status_code={status_code}, response={add_response}")
+        logger.info(f"[JOIN_FAMILY] Respuesta de add_member_to_family: status_code={status_code}, response={add_response}")
         
         if status_code >= 400:
+            logger.error(f"[JOIN_FAMILY] Error al unir usuario a familia: código {status_code}")
             await update.message.reply_text(
                 f"❌ Error al unirte a la familia. Código de error: {status_code}"
             )
@@ -262,11 +315,11 @@ async def join_family(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Guardar el ID de la familia en el contexto
         context.user_data["family_id"] = family_id
-        print(f"ID de familia guardado en el contexto: {context.user_data['family_id']}")
+        logger.info(f"[JOIN_FAMILY] ID de familia guardado en el contexto: {context.user_data['family_id']}")
         
         # Cargar los miembros de la familia
         success = await ContextManager.load_family_members(context, family_id)
-        print(f"Carga de miembros de la familia: {'exitosa' if success else 'fallida'}")
+        logger.info(f"[JOIN_FAMILY] Carga de miembros de la familia: {'exitosa' if success else 'fallida'}")
         
         await update.message.reply_text(
             Messages.JOIN_FAMILY_SUCCESS.format(family_name=family_name),
@@ -274,12 +327,13 @@ async def join_family(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         # Mostrar el menú principal
+        logger.info(f"[JOIN_FAMILY] Mostrando menú principal para usuario {user_id}")
         from handlers.menu_handler import show_main_menu
         await show_main_menu(update, context)
         return ConversationHandler.END
         
     except Exception as e:
-        print(f"Error al unirse a la familia: {str(e)}")
+        logger.error(f"[JOIN_FAMILY] Error al unirse a la familia: {str(e)}")
         await send_error(update, context, f"Error al unirse a la familia: {str(e)}")
         return JOIN_FAMILY_CODE  # Mantener el estado para permitir otro intento
 
