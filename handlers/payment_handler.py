@@ -201,8 +201,14 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "name": member_name,
                     "debt_amount": debt_amount
                 })
-                button_text = f"{member_name.upper()} -> ${debt_amount:.2f}"
-                member_buttons.append([button_text])
+                # En lugar de un solo botón, añadimos un título para el miembro
+                button_title = f"💸 {member_name} (${debt_amount:.2f})"
+                member_buttons.append([button_title])
+                # Y dos botones: uno para pago parcial y otro para pago total
+                member_buttons.append([
+                    f"⚖️ Pago Parcial: {member_name}",
+                    f"✅ Pago Total: {member_name}"
+                ])
         
         # Verificar si después del filtrado queda algún miembro para mostrar
         if not members_with_debt:
@@ -269,15 +275,71 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Recuperar la lista filtrada de miembros con deuda
         members_with_debt = context.user_data.get("payment_data", {}).get("members_with_debt", [])
         
-        # Extraer solo el nombre del miembro del texto seleccionado
-        # El formato es "NOMBRE -> $XX.XX"
-        parts = selected_text.split(" ")
-        member_name = parts[0]
+        # Verificar si es una opción de título (no seleccionable)
+        if selected_text.startswith("💸 "):
+            # Si el usuario seleccionó el título, mostrar un mensaje y pedir que seleccione una opción válida
+            buttons = []
+            for member in members_with_debt:
+                member_name = member.get("name")
+                debt_amount = member.get("debt_amount", 0)
+                
+                button_title = f"💸 {member_name} (${debt_amount:.2f})"
+                buttons.append([button_title])
+                buttons.append([
+                    f"⚖️ Pago Parcial: {member_name}",
+                    f"✅ Pago Total: {member_name}"
+                ])
+            buttons.append(["❌ Cancelar"])
+            
+            await update.message.reply_text(
+                "Por favor, selecciona una opción de pago parcial o total:",
+                reply_markup=ReplyKeyboardMarkup(
+                    buttons,
+                    one_time_keyboard=True,
+                    resize_keyboard=True
+                )
+            )
+            return SELECT_TO_MEMBER
         
-        # Buscar el miembro por nombre (ignorando mayúsculas/minúsculas)
+        # Determinar si es pago parcial o total
+        is_partial_payment = selected_text.startswith("⚖️ Pago Parcial:")
+        is_total_payment = selected_text.startswith("✅ Pago Total:")
+        
+        # Extraer el nombre del miembro según el formato del botón
+        member_name = None
+        if is_partial_payment:
+            member_name = selected_text.replace("⚖️ Pago Parcial:", "").strip()
+        elif is_total_payment:
+            member_name = selected_text.replace("✅ Pago Total:", "").strip()
+        else:
+            # Si no es una opción válida, volver a pedir
+            buttons = []
+            for member in members_with_debt:
+                member_name = member.get("name")
+                debt_amount = member.get("debt_amount", 0)
+                
+                button_title = f"💸 {member_name} (${debt_amount:.2f})"
+                buttons.append([button_title])
+                buttons.append([
+                    f"⚖️ Pago Parcial: {member_name}",
+                    f"✅ Pago Total: {member_name}"
+                ])
+            buttons.append(["❌ Cancelar"])
+            
+            await update.message.reply_text(
+                "Opción no válida. Por favor, selecciona una opción de pago parcial o total:",
+                reply_markup=ReplyKeyboardMarkup(
+                    buttons,
+                    one_time_keyboard=True,
+                    resize_keyboard=True
+                )
+            )
+            return SELECT_TO_MEMBER
+        
+        # Buscar el miembro por nombre
         selected_member = None
         for member in members_with_debt:
-            if member.get("name").upper() == member_name:
+            if member.get("name") == member_name:
                 selected_member = member
                 break
         
@@ -285,9 +347,15 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Si no se encuentra el miembro, mostrar error y volver a pedir
             buttons = []
             for member in members_with_debt:
+                member_name = member.get("name")
                 debt_amount = member.get("debt_amount", 0)
-                button_text = f"{member.get('name').upper()} -> ${debt_amount:.2f}"
-                buttons.append([button_text])
+                
+                button_title = f"💸 {member_name} (${debt_amount:.2f})"
+                buttons.append([button_title])
+                buttons.append([
+                    f"⚖️ Pago Parcial: {member_name}",
+                    f"✅ Pago Total: {member_name}"
+                ])
             buttons.append(["❌ Cancelar"])
             
             await update.message.reply_text(
@@ -308,6 +376,13 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["payment_data"]["to_member_name"] = to_member_name
         context.user_data["payment_data"]["debt_amount"] = debt_amount
         
+        # Si es un pago total, establecer el monto directamente y pasar a confirmación
+        if is_total_payment:
+            context.user_data["payment_data"]["amount"] = debt_amount
+            # Ir directamente a la confirmación
+            return await show_payment_confirmation(update, context)
+        
+        # Si es pago parcial, continuar con el flujo normal para pedir el monto
         # Preparar el mensaje para pedir el monto del pago
         message_text = Messages.CREATE_PAYMENT_AMOUNT.format(to_member=to_member_name)
         
