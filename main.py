@@ -142,44 +142,46 @@ def main():
     # Register global error handler
     register_error_handlers(application)
     
-    # Añadir el comando para iniciar el chat
-    application.add_handler(CommandHandler("start", start))
+    # REESTRUCTURACIÓN COMPLETA DE HANDLERS
     
-    # Añadir comando para mostrar el menú principal
+    # Comandos básicos que deben estar siempre disponibles
     application.add_handler(CommandHandler("menu", show_main_menu))
-    
-    # Añadir comando para actualizar el teclado
     application.add_handler(CommandHandler("teclado", update_keyboard))
-    
-    # Añadir comando para ver pagos directamente
     application.add_handler(CommandHandler("pagos", listar_pagos))
     
-    # Manejador para el flujo de creación de familia
-    family_handler = ConversationHandler(
+    # Crear el manejador para el flujo de creación de familia con alta prioridad
+    family_conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("start", start),
+            CommandHandler("start", start)
         ],
         states={
             ASK_FAMILY_CODE: [
-                # Usar patrones más flexibles para los botones
-                MessageHandler(filters.Regex("(?i).*crear.*familia.*|.*🏠.*"), start_create_family),
-                MessageHandler(filters.Regex("(?i).*unirse.*familia.*|.*🔗.*"), start_join_family),
-                # Capturar cualquier otro texto para evitar que se active el unknown_handler
-                MessageHandler(filters.TEXT & ~filters.COMMAND, start_create_family),
+                # Para depuración, registremos el mensaje exacto
+                MessageHandler(filters.TEXT & ~filters.COMMAND, 
+                               lambda update, context: 
+                                   logger.info(f"[DEBUG] Mensaje exacto recibido: '{update.message.text}'") or start_create_family(update, context)),
             ],
-            ASK_FAMILY_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_user_name)],
-            ASK_USER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, create_family_with_names)],
-            JOIN_FAMILY_CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, join_family)]
+            ASK_FAMILY_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_user_name)
+            ],
+            ASK_USER_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, create_family_with_names)
+            ],
+            JOIN_FAMILY_CODE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, join_family)
+            ]
         },
-        fallbacks=[CommandHandler("cancel", cancel)]
+        fallbacks=[
+            CommandHandler("cancel", cancel)
+        ],
+        name="family_conversation",
+        persistent=False
     )
-    # Añadir el family_handler al principio para que tenga prioridad
-    application.add_handler(family_handler)
     
-    # Manejador para el flujo de edición/eliminación
-    edit_handler = ConversationHandler(
+    # Manejadores para otros flujos
+    edit_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^✏️ Editar/Eliminar$"), show_edit_options),
+            MessageHandler(filters.Regex("^✏️ Editar/Eliminar$"), show_edit_options)
         ],
         states={
             EDIT_OPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_option)],
@@ -188,69 +190,80 @@ def main():
             CONFIRM_DELETE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_confirm_delete)],
             EDIT_EXPENSE_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_expense_amount)]
         },
-        fallbacks=[CommandHandler("cancel", edit_cancel)]
+        fallbacks=[
+            CommandHandler("cancel", edit_cancel)
+        ],
+        name="edit_conversation",
+        persistent=False
     )
-    application.add_handler(edit_handler)
     
-    # Manejador para el flujo de gastos
-    expense_handler = ConversationHandler(
+    expense_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^💸 Crear Gasto$"), crear_gasto),
+            MessageHandler(filters.Regex("^💸 Crear Gasto$"), crear_gasto)
         ],
         states={
             DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_description)],
             AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_amount)],
             CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_expense)]
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel)
+        ],
         name="expense_conversation",
         persistent=False
     )
-    application.add_handler(expense_handler)
     
-    # Manejador para el flujo de pagos
-    payment_handler = ConversationHandler(
+    payment_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^💳 Registrar Pago$"), registrar_pago),
+            MessageHandler(filters.Regex("^💳 Registrar Pago$"), registrar_pago)
         ],
         states={
             SELECT_TO_MEMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_to_member)],
             PAYMENT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_payment_amount)],
             PAYMENT_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_payment)]
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel)
+        ],
         name="payment_conversation",
         persistent=False
     )
-    application.add_handler(payment_handler)
     
-    # Manejador para el flujo de listar registros
-    list_handler = ConversationHandler(
+    list_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^📜 Listar Registros$"), show_list_options),
+            MessageHandler(filters.Regex("^📜 Listar Registros$"), show_list_options)
         ],
         states={
             LIST_OPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_list_option)]
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel)
+        ],
         name="list_conversation",
         persistent=False
     )
-    application.add_handler(list_handler)
     
-    # Manejador para opciones del menú principal
-    menu_handler = MessageHandler(
-        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación|✏️ Editar/Eliminar|💳 Registrar Pago|💸 Crear Gasto|📜 Listar Registros)$"),
+    # Añadir todos los handlers en el orden correcto
+    # El orden es importante: desde el más específico hasta el más general
+    
+    # 1. Los handlers de conversación (manejan flujos específicos)
+    application.add_handler(family_conv_handler)
+    application.add_handler(edit_conv_handler)
+    application.add_handler(expense_conv_handler)
+    application.add_handler(payment_conv_handler)
+    application.add_handler(list_conv_handler)
+    
+    # 2. Manejador para opciones específicas del menú principal
+    application.add_handler(MessageHandler(
+        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación)$"),
         handle_menu_option
-    )
-    application.add_handler(menu_handler)
+    ))
     
-    # Manejador para texto desconocido (debe ser el último)
-    unknown_handler = MessageHandler(
+    # 3. Manejador para texto desconocido (debe ser el último)
+    application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, 
         handle_unknown_text
-    )
-    application.add_handler(unknown_handler)
+    ))
     
     # Iniciar el bot
     logger.info("Bot is ready to handle updates")
