@@ -201,14 +201,9 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "name": member_name,
                     "debt_amount": debt_amount
                 })
-                # En lugar de un solo botón, añadimos un título para el miembro
-                button_title = f"💸 {member_name} (${debt_amount:.2f})"
-                member_buttons.append([button_title])
-                # Y dos botones: uno para pago parcial y otro para pago total
-                member_buttons.append([
-                    f"⚖️ Pago Parcial: {member_name}",
-                    f"✅ Pago Total: {member_name}"
-                ])
+                # Mostrar solo el nombre del miembro y su deuda
+                button_text = f"{member_name} - ${debt_amount:.2f}"
+                member_buttons.append([button_text])
         
         # Verificar si después del filtrado queda algún miembro para mostrar
         if not members_with_debt:
@@ -247,10 +242,7 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handles the selection of the payment recipient.
-    
-    This function processes the user's selection of which family member
-    will receive the payment and prompts for the payment amount.
+    Handles the selection of the payment recipient and payment type.
     
     Args:
         update (Update): Telegram Update object
@@ -272,135 +264,144 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _show_menu(update, context)
             return ConversationHandler.END
         
-        # Recuperar la lista filtrada de miembros con deuda
-        members_with_debt = context.user_data.get("payment_data", {}).get("members_with_debt", [])
+        # Verificar si ya tenemos un miembro seleccionado en el contexto
+        payment_data = context.user_data.get("payment_data", {})
+        to_member_id = payment_data.get("to_member_id")
         
-        # Verificar si es una opción de título (no seleccionable)
-        if selected_text.startswith("💸 "):
-            # Si el usuario seleccionó el título, mostrar un mensaje y pedir que seleccione una opción válida
-            buttons = []
-            for member in members_with_debt:
-                member_name = member.get("name")
-                debt_amount = member.get("debt_amount", 0)
-                
-                button_title = f"💸 {member_name} (${debt_amount:.2f})"
-                buttons.append([button_title])
-                buttons.append([
-                    f"⚖️ Pago Parcial: {member_name}",
-                    f"✅ Pago Total: {member_name}"
-                ])
-            buttons.append(["❌ Cancelar"])
+        if to_member_id:
+            # Ya tenemos un miembro seleccionado, procesamos la selección del tipo de pago
+            to_member_name = payment_data.get("to_member_name")
+            debt_amount = payment_data.get("debt_amount", 0)
             
-            await update.message.reply_text(
-                "Por favor, selecciona una opción de pago parcial o total:",
-                reply_markup=ReplyKeyboardMarkup(
-                    buttons,
-                    one_time_keyboard=True,
-                    resize_keyboard=True
+            if selected_text == "Pago Parcial":
+                # Si es pago parcial, continuar con el flujo normal para pedir el monto
+                message_text = Messages.CREATE_PAYMENT_AMOUNT.format(to_member=to_member_name)
+                
+                # Añadir la deuda actual y sugerir ese monto para el pago
+                message_text += f"\n\n💡 Deuda actual: ${debt_amount:.2f}"
+                message_text += f"\n\n💰 *Sugerencia:* Puedes escribir \"{debt_amount:.2f}\" para pagar la deuda completa."
+                
+                await update.message.reply_text(
+                    message_text,
+                    parse_mode="Markdown",
+                    reply_markup=Keyboards.get_cancel_keyboard()
                 )
-            )
-            return SELECT_TO_MEMBER
-        
-        # Determinar si es pago parcial o total
-        is_partial_payment = selected_text.startswith("⚖️ Pago Parcial:")
-        is_total_payment = selected_text.startswith("✅ Pago Total:")
-        
-        # Extraer el nombre del miembro según el formato del botón
-        member_name = None
-        if is_partial_payment:
-            member_name = selected_text.replace("⚖️ Pago Parcial:", "").strip()
-        elif is_total_payment:
-            member_name = selected_text.replace("✅ Pago Total:", "").strip()
+                
+                # Pasar al siguiente estado: ingresar monto
+                return PAYMENT_AMOUNT
+                
+            elif selected_text == f"Pago Total: ${debt_amount:.2f}":
+                # Si es un pago total, establecer el monto directamente y pasar a confirmación
+                context.user_data["payment_data"]["amount"] = debt_amount
+                # Ir directamente a la confirmación
+                return await show_payment_confirmation(update, context)
+                
+            else:
+                # Opción no válida, volver a mostrar las opciones de pago
+                payment_options = [
+                    ["Pago Parcial"],
+                    [f"Pago Total: ${debt_amount:.2f}"],
+                    ["❌ Cancelar"]
+                ]
+                
+                await update.message.reply_text(
+                    f"Opción no válida. Por favor, selecciona un tipo de pago para {to_member_name}:",
+                    reply_markup=ReplyKeyboardMarkup(
+                        payment_options,
+                        one_time_keyboard=True,
+                        resize_keyboard=True
+                    )
+                )
+                
+                return SELECT_TO_MEMBER
         else:
-            # Si no es una opción válida, volver a pedir
-            buttons = []
-            for member in members_with_debt:
-                member_name = member.get("name")
-                debt_amount = member.get("debt_amount", 0)
+            # No tenemos un miembro seleccionado, procesamos la selección del miembro
+            
+            # Recuperar la lista filtrada de miembros con deuda
+            members_with_debt = context.user_data.get("payment_data", {}).get("members_with_debt", [])
+            
+            # Extraer el nombre del miembro del texto seleccionado
+            # El formato es "nombre - $XX.XX"
+            parts = selected_text.split(" - ")
+            if len(parts) < 2:
+                # Formato incorrecto, volver a mostrar las opciones
+                buttons = []
+                for member in members_with_debt:
+                    member_name = member.get("name")
+                    debt_amount = member.get("debt_amount", 0)
+                    button_text = f"{member_name} - ${debt_amount:.2f}"
+                    buttons.append([button_text])
+                buttons.append(["❌ Cancelar"])
                 
-                button_title = f"💸 {member_name} (${debt_amount:.2f})"
-                buttons.append([button_title])
-                buttons.append([
-                    f"⚖️ Pago Parcial: {member_name}",
-                    f"✅ Pago Total: {member_name}"
-                ])
-            buttons.append(["❌ Cancelar"])
+                await update.message.reply_text(
+                    "Opción no válida. Por favor, selecciona un miembro de la lista:",
+                    reply_markup=ReplyKeyboardMarkup(
+                        buttons,
+                        one_time_keyboard=True,
+                        resize_keyboard=True
+                    )
+                )
+                return SELECT_TO_MEMBER
+                
+            member_name = parts[0]
+            
+            # Buscar el miembro por nombre
+            selected_member = None
+            for member in members_with_debt:
+                if member.get("name") == member_name:
+                    selected_member = member
+                    break
+            
+            if not selected_member:
+                # Si no se encuentra el miembro, mostrar error y volver a pedir
+                buttons = []
+                for member in members_with_debt:
+                    member_name = member.get("name")
+                    debt_amount = member.get("debt_amount", 0)
+                    button_text = f"{member_name} - ${debt_amount:.2f}"
+                    buttons.append([button_text])
+                buttons.append(["❌ Cancelar"])
+                
+                await update.message.reply_text(
+                    f"Miembro '{member_name}' no encontrado. Por favor, selecciona un miembro de la lista:",
+                    reply_markup=ReplyKeyboardMarkup(
+                        buttons,
+                        one_time_keyboard=True,
+                        resize_keyboard=True
+                    )
+                )
+                return SELECT_TO_MEMBER
+            
+            # Guardar el ID del miembro destinatario en el contexto
+            to_member_id = selected_member.get("id")
+            to_member_name = selected_member.get("name")
+            debt_amount = selected_member.get("debt_amount", 0)
+            context.user_data["payment_data"]["to_member_id"] = to_member_id
+            context.user_data["payment_data"]["to_member_name"] = to_member_name
+            context.user_data["payment_data"]["debt_amount"] = debt_amount
+            
+            # Ahora que se seleccionó el miembro, mostrar las opciones de pago
+            payment_options = [
+                ["Pago Parcial"],
+                [f"Pago Total: ${debt_amount:.2f}"],
+                ["❌ Cancelar"]
+            ]
             
             await update.message.reply_text(
-                "Opción no válida. Por favor, selecciona una opción de pago parcial o total:",
+                f"Has seleccionado a *{to_member_name}*.\nDeuda actual: ${debt_amount:.2f}\n\n¿Qué tipo de pago deseas realizar?",
+                parse_mode="Markdown",
                 reply_markup=ReplyKeyboardMarkup(
-                    buttons,
+                    payment_options,
                     one_time_keyboard=True,
                     resize_keyboard=True
                 )
             )
-            return SELECT_TO_MEMBER
-        
-        # Buscar el miembro por nombre
-        selected_member = None
-        for member in members_with_debt:
-            if member.get("name") == member_name:
-                selected_member = member
-                break
-        
-        if not selected_member:
-            # Si no se encuentra el miembro, mostrar error y volver a pedir
-            buttons = []
-            for member in members_with_debt:
-                member_name = member.get("name")
-                debt_amount = member.get("debt_amount", 0)
-                
-                button_title = f"💸 {member_name} (${debt_amount:.2f})"
-                buttons.append([button_title])
-                buttons.append([
-                    f"⚖️ Pago Parcial: {member_name}",
-                    f"✅ Pago Total: {member_name}"
-                ])
-            buttons.append(["❌ Cancelar"])
             
-            await update.message.reply_text(
-                f"Miembro '{member_name}' no encontrado. Por favor, selecciona un miembro de la lista:",
-                reply_markup=ReplyKeyboardMarkup(
-                    buttons,
-                    one_time_keyboard=True,
-                    resize_keyboard=True
-                )
-            )
+            # Seguimos en el mismo estado, pero ahora esperando la selección del tipo de pago
             return SELECT_TO_MEMBER
-        
-        # Guardar el ID del miembro destinatario en el contexto
-        to_member_id = selected_member.get("id")
-        to_member_name = selected_member.get("name")
-        debt_amount = selected_member.get("debt_amount", 0)
-        context.user_data["payment_data"]["to_member_id"] = to_member_id
-        context.user_data["payment_data"]["to_member_name"] = to_member_name
-        context.user_data["payment_data"]["debt_amount"] = debt_amount
-        
-        # Si es un pago total, establecer el monto directamente y pasar a confirmación
-        if is_total_payment:
-            context.user_data["payment_data"]["amount"] = debt_amount
-            # Ir directamente a la confirmación
-            return await show_payment_confirmation(update, context)
-        
-        # Si es pago parcial, continuar con el flujo normal para pedir el monto
-        # Preparar el mensaje para pedir el monto del pago
-        message_text = Messages.CREATE_PAYMENT_AMOUNT.format(to_member=to_member_name)
-        
-        # Añadir la deuda actual y sugerir ese monto para el pago
-        message_text += f"\n\n💡 Deuda actual: ${debt_amount:.2f}"
-        message_text += f"\n\n💰 *Sugerencia:* Puedes escribir \"{debt_amount:.2f}\" para pagar la deuda completa."
-        
-        await update.message.reply_text(
-            message_text,
-            parse_mode="Markdown",
-            reply_markup=Keyboards.get_cancel_keyboard()
-        )
-        
-        # Pasar al siguiente estado: ingresar monto
-        return PAYMENT_AMOUNT
         
     except Exception as e:
-        await send_error(update, context, f"Error al seleccionar el destinatario: {str(e)}")
+        await send_error(update, context, f"Error al seleccionar el destinatario o tipo de pago: {str(e)}")
         await _show_menu(update, context)
         return ConversationHandler.END
 
