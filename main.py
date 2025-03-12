@@ -161,7 +161,9 @@ def main():
         ],
         states={
             ASK_FAMILY_CODE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, start_create_family),
+                MessageHandler(filters.Regex("^🏠 Crear Familia$"), start_create_family),
+                MessageHandler(filters.Regex("^🔗 Unirse a Familia$"), start_join_family),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, start_create_family),  # Capturar cualquier otro texto
             ],
             ASK_FAMILY_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_user_name)],
             ASK_USER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, create_family_with_names)],

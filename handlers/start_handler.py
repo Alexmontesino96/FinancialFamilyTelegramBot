@@ -73,20 +73,18 @@ async def start_create_family(update: Update, context: ContextTypes.DEFAULT_TYPE
     Returns:
         int: The next conversation state
     """
-    option = update.message.text.strip()
+    option = update.message.text
     
     print(f"Opción seleccionada: {option}")
     
-    # Verificamos si contiene las palabras clave para crear familia
-    if "crear" in option.lower() or "crear familia" in option.lower() or "🏠" in option:
+    if option == "🏠 Crear Familia":
         # Iniciamos el flujo de creación de familia
         await update.message.reply_text(
             Messages.CREATE_FAMILY_INTRO,
             reply_markup=Keyboards.remove_keyboard()
         )
         return ASK_FAMILY_NAME
-    # Verificamos si contiene las palabras clave para unirse a familia
-    elif "unirse" in option.lower() or "unirse a familia" in option.lower() or "🔗" in option:
+    elif option == "🔗 Unirse a Familia":
         # En lugar de llamar a start_join_family, configuramos el estado directamente
         await update.message.reply_text(
             Messages.JOIN_FAMILY_INTRO,
