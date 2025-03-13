@@ -266,8 +266,14 @@ class Formatters:
                 if debts and len(debts) > 0 and isinstance(debts, list):
                     debts_list = []
                     for d in debts:
-                        # Obtener el nombre del acreedor directamente del campo 'to'
+                        # Usar preferentemente el campo to_id para la lógica interna
+                        to_id = d.get('to_id')
+                        # Obtener el nombre del acreedor directamente del campo 'to' (ahora alias de to_name)
                         to_name = d.get('to', 'Desconocido')
+                        
+                        # Registrar la información para depuración
+                        print(f"Deuda: to_id={to_id}, to_name={to_name}")
+                        
                         debts_list.append(f"• Debe a {to_name}: ${d.get('amount', 0):.2f}")
                     debts_text = "\n".join(debts_list)
                 else:
@@ -278,8 +284,14 @@ class Formatters:
                 if credits and len(credits) > 0 and isinstance(credits, list):
                     credits_list = []
                     for c in credits:
-                        # Obtener el nombre del deudor directamente del campo 'from'
+                        # Usar preferentemente el campo from_id para la lógica interna
+                        from_id = c.get('from_id')
+                        # Obtener el nombre del deudor directamente del campo 'from' (ahora alias de from_name)
                         from_name = c.get('from', 'Desconocido')
+                        
+                        # Registrar la información para depuración
+                        print(f"Crédito: from_id={from_id}, from_name={from_name}")
+                        
                         credits_list.append(f"• Le debe {from_name}: ${c.get('amount', 0):.2f}")
                     credits_text = "\n".join(credits_list)
                 else:
