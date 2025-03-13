@@ -431,6 +431,12 @@ async def get_payment_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
             return ConversationHandler.END
         
+        # Recuperar la información de deuda almacenada en el contexto
+        payment_data = context.user_data.get("payment_data", {})
+        to_member_id = payment_data.get("to_member_id")
+        to_member_name = payment_data.get("to_member_name")
+        debt_amount = payment_data.get("debt_amount", 0)
+        
         # Intentar convertir el texto a un número flotante
         try:
             # Reemplazar comas por puntos para manejar diferentes formatos numéricos
@@ -445,10 +451,53 @@ async def get_payment_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 return PAYMENT_AMOUNT
                 
+            # Verificar que el monto no exceda la deuda actual
+            if amount > debt_amount:
+                # Si el monto es mayor, ofrecer opciones al usuario
+                keyboard = [
+                    [f"✅ Pagar ${debt_amount:.2f} (deuda completa)"],  # Opción para pagar la deuda exacta
+                    ["🔄 Ingresar otro monto"],                         # Opción para ingresar otro monto
+                    ["❌ Cancelar"]                                      # Opción para cancelar
+                ]
+                
+                await update.message.reply_text(
+                    f"⚠️ *Aviso de Pago*\n\n"
+                    f"El monto ingresado (${amount:.2f}) excede tu deuda actual con {to_member_name} (${debt_amount:.2f}).\n\n"
+                    f"¿Qué deseas hacer?",
+                    parse_mode="Markdown",
+                    reply_markup=ReplyKeyboardMarkup(
+                        keyboard,
+                        one_time_keyboard=True,
+                        resize_keyboard=True
+                    )
+                )
+                
+                # Guardar temporalmente el monto ingresado para referencia
+                context.user_data["payment_data"]["temp_amount"] = amount
+                
+                # Permanecemos en el mismo estado
+                return PAYMENT_AMOUNT
+                
         except ValueError:
             # Si no se puede convertir a número, mostrar error
             await update.message.reply_text(
                 "El valor ingresado no es un número válido. Por favor, ingresa solo números:",
+                reply_markup=Keyboards.get_cancel_keyboard()
+            )
+            return PAYMENT_AMOUNT
+            
+        # Manejar respuesta a las opciones ofrecidas para pagos excesivos
+        if update.message.text == f"✅ Pagar ${debt_amount:.2f} (deuda completa)":
+            # El usuario eligió pagar el monto exacto de la deuda
+            amount = debt_amount
+            await update.message.reply_text(
+                f"✅ Se ajustó el monto del pago a ${amount:.2f}, que es el valor exacto de la deuda con {to_member_name}.",
+                parse_mode="Markdown"
+            )
+        elif update.message.text == "🔄 Ingresar otro monto":
+            # El usuario quiere ingresar otro monto
+            await update.message.reply_text(
+                f"Por favor, ingresa un monto que no exceda ${debt_amount:.2f}:",
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
             return PAYMENT_AMOUNT
@@ -595,9 +644,14 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Manejar específicamente el error de exceso de pago
                 error_message = ""
                 
-                # Verificar si response_data es un diccionario y contiene 'message'
-                if isinstance(response_data, dict) and "message" in response_data:
-                    error_message = response_data.get("message", "")
+                # Extraer el mensaje de error de la respuesta, manejando tanto una estructura plana como anidada
+                if isinstance(response_data, dict):
+                    # Verificar si el mensaje está directamente en response_data['message']
+                    if "message" in response_data:
+                        error_message = response_data.get("message", "")
+                    # Verificar si el mensaje está anidado en response_data['error']['message']
+                    elif "error" in response_data and isinstance(response_data["error"], dict):
+                        error_message = response_data["error"].get("message", "")
                     
                     # Verificar si el error menciona que el monto excede la deuda
                     if "excede la deuda actual" in error_message and debt_amount > 0:
