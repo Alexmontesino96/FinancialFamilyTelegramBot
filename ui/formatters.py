@@ -314,14 +314,18 @@ class Formatters:
                 is_current_member = current_member_id is not None and str(member_id) == str(current_member_id)
                 
                 # Formatear el nombre según si es el miembro actual o no
-                formatted_name = f"**{member_name}**" if is_current_member else f"*{member_name}*"
+                # En Telegram Markdown, usamos * para negrita y símbolos adicionales para destacar al usuario actual
+                if is_current_member:
+                    formatted_name = f"*{member_name}* 👈"  # Negrita con un emoji indicador
+                else:
+                    formatted_name = f"{member_name}"  # Sin formato especial para otros miembros
                 
                 # Construir el mensaje completo para este miembro
                 member_text = (
                     f"👤 {formatted_name}\n"
-                    f"{balance_emoji} Balance neto: ${net_balance:.2f}\n"
-                    f"💰 Total a favor: ${balance.get('total_owed', 0):.2f}\n"
-                    f"💸 Total a deber: ${balance.get('total_debt', 0):.2f}\n\n"
+                    f"{balance_emoji} Balance neto: *${net_balance:.2f}*\n"
+                    f"💰 Total a favor: *${balance.get('total_owed', 0):.2f}*\n"
+                    f"💸 Total a deber: *${balance.get('total_debt', 0):.2f}*\n\n"
                     f"*Deudas:*\n{debts_text}\n\n"
                     f"*Créditos:*\n{credits_text}"
                 )
