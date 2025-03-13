@@ -271,10 +271,8 @@ class Formatters:
                         # Obtener el nombre del acreedor directamente del campo 'to' (ahora alias de to_name)
                         to_name = d.get('to', 'Desconocido')
                         
-                        # Registrar la información para depuración
-                        print(f"Deuda: to_id={to_id}, to_name={to_name}")
                         
-                        debts_list.append(f"• Debe a {to_name}: ${d.get('amount', 0):.2f}")
+                        debts_list.append(f"* {to_name}: ${d.get('amount', 0):.2f}")
                     debts_text = "\n".join(debts_list)
                 else:
                     debts_text = "• No debe a nadie"
@@ -292,7 +290,7 @@ class Formatters:
                         # Registrar la información para depuración
                         print(f"Crédito: from_id={from_id}, from_name={from_name}")
                         
-                        credits_list.append(f"• Le debe {from_name}: ${c.get('amount', 0):.2f}")
+                        credits_list.append(f"* {from_name}: ${c.get('amount', 0):.2f}")
                     credits_text = "\n".join(credits_list)
                 else:
                     credits_text = "• Nadie le debe"

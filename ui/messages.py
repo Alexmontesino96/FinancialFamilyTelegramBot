@@ -68,7 +68,6 @@ class Messages:
     EXPENSES_LIST_HEADER = "📋 *Lista de Gastos*\n\n"
     
     EXPENSE_LIST_ITEM = (
-        "*ID:* `{id}`\n"
         "*Descripción:* {description}\n"
         "*Monto:* {amount}\n"
         "*Pagado por:* {paid_by}\n"
@@ -80,7 +79,6 @@ class Messages:
     PAYMENTS_LIST_HEADER = "💳 *Lista de Pagos*\n\n"
     
     PAYMENT_LIST_ITEM = (
-        "*ID:* `{id}`\n"
         "*De:* {from_member}\n"
         "*Para:* {to_member}\n"
         "*Monto:* {amount}\n"
