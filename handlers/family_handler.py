@@ -65,6 +65,10 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Guardar el ID de Telegram en el contexto para uso futuro
         context.user_data["telegram_id"] = telegram_id
         
+        # Verificar si ya tenemos el ID del miembro actual en el contexto
+        current_member_id = context.user_data.get("current_member_id")
+        print(f"ID del miembro recuperado del contexto: {current_member_id}")
+        
         # Primero, obtener la información completa de la familia para tener la lista de miembros
         status_code, family = FamilyService.get_family(family_id, telegram_id)
         print(f"Respuesta de get_family: status_code={status_code}, family={family}")
@@ -80,26 +84,55 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         # Crear un diccionario de IDs de miembros a nombres
         member_names = {}
-        if "members" in family and isinstance(family["members"], list):
-            for member in family["members"]:
-                member_id = member.get("id")
-                member_name = member.get("name", "Desconocido")
-                
-                # Guardar en el diccionario tanto como string como como ID nativo
-                if member_id is not None:
-                    # Guardar como string
-                    member_names[str(member_id)] = member_name
+        
+        # Buscar el ID del miembro actual si no lo tenemos en el contexto
+        if not current_member_id:
+            if "members" in family and isinstance(family["members"], list):
+                for member in family["members"]:
+                    member_id = member.get("id")
+                    member_name = member.get("name", "Desconocido")
+                    telegram_member_id = member.get("telegram_id")
                     
-                    # Intentar guardar como entero si es posible
-                    if isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
-                        try:
-                            numeric_id = int(member_id) if isinstance(member_id, str) else member_id
-                            member_names[numeric_id] = member_name
-                        except (ValueError, TypeError):
-                            pass
+                    # Si este miembro corresponde al usuario actual, guardar su ID en el contexto
+                    if telegram_member_id and str(telegram_member_id) == telegram_id:
+                        current_member_id = member_id
+                        context.user_data["current_member_id"] = current_member_id
+                        print(f"ID del miembro actual encontrado y guardado en contexto: {current_member_id}")
                     
-                    # Guardar con el formato "Usuario X" para compatibilidad
-                    member_names[f"Usuario {member_id}"] = member_name
+                    # Guardar en el diccionario tanto como string como como ID nativo
+                    if member_id is not None:
+                        # Guardar como string
+                        member_names[str(member_id)] = member_name
+                        
+                        # Intentar guardar como entero si es posible
+                        if isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
+                            try:
+                                numeric_id = int(member_id) if isinstance(member_id, str) else member_id
+                                member_names[numeric_id] = member_name
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        # Guardar con el formato "Usuario X" para compatibilidad
+                        member_names[f"Usuario {member_id}"] = member_name
+        else:
+            # Si ya teníamos el ID del miembro, solo necesitamos cargar los nombres
+            if "members" in family and isinstance(family["members"], list):
+                for member in family["members"]:
+                    member_id = member.get("id")
+                    member_name = member.get("name", "Desconocido")
+                    
+                    if member_id is not None:
+                        member_names[str(member_id)] = member_name
+                        
+                        # Otras conversiones (entero, Usuario X, etc.)
+                        if isinstance(member_id, int) or (isinstance(member_id, str) and member_id.isdigit()):
+                            try:
+                                numeric_id = int(member_id) if isinstance(member_id, str) else member_id
+                                member_names[numeric_id] = member_name
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        member_names[f"Usuario {member_id}"] = member_name
                     
         # Guardar los nombres de los miembros en el contexto
         context.user_data["member_names"] = member_names
@@ -122,7 +155,8 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return ConversationHandler.END
         
         # Formatear los balances para mostrarlos al usuario, pasando los nombres de los miembros
-        formatted_balances = Formatters.format_balances(balances, member_names)
+        # y el ID del miembro actual para que aparezca primero
+        formatted_balances = Formatters.format_balances(balances, member_names, current_member_id)
         
         # Mostrar los balances al usuario
         await update.message.reply_text(
