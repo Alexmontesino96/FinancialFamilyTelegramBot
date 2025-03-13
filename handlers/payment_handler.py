@@ -421,15 +421,7 @@ async def get_payment_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """
     try:
         # Obtener el texto del monto ingresado
-        amount_text = update.message.text
-        
-        # Verificar si el usuario canceló la operación
-        if amount_text == "❌ Cancelar":
-            await update.message.reply_text(
-                "Has cancelado el registro de pago.",
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
-            return ConversationHandler.END
+        input_text = update.message.text.strip()
         
         # Recuperar la información de deuda almacenada en el contexto
         payment_data = context.user_data.get("payment_data", {})
@@ -437,10 +429,41 @@ async def get_payment_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
         to_member_name = payment_data.get("to_member_name")
         debt_amount = payment_data.get("debt_amount", 0)
         
-        # Intentar convertir el texto a un número flotante
+        # Verificar si el usuario canceló la operación
+        if input_text == "❌ Cancelar":
+            await update.message.reply_text(
+                "Has cancelado el registro de pago.",
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
+            
+        # Verificar primero si es alguna de nuestras opciones especiales
+        if input_text.startswith(f"✅ Pagar ${debt_amount:.2f}"):
+            # El usuario eligió pagar el monto exacto de la deuda
+            amount = debt_amount
+            await update.message.reply_text(
+                f"✅ Se ajustó el monto del pago a ${amount:.2f}, que es el valor exacto de la deuda con {to_member_name}.",
+                parse_mode="Markdown"
+            )
+            
+            # Guardar el monto validado en el contexto
+            context.user_data["payment_data"]["amount"] = amount
+            
+            # Mostrar la confirmación del pago
+            return await show_payment_confirmation(update, context)
+            
+        elif input_text == "🔄 Ingresar otro monto":
+            # El usuario quiere ingresar otro monto
+            await update.message.reply_text(
+                f"Por favor, ingresa un monto que no exceda ${debt_amount:.2f}:",
+                reply_markup=Keyboards.get_cancel_keyboard()
+            )
+            return PAYMENT_AMOUNT
+            
+        # Si no es una opción especial, intentar convertir a número
         try:
             # Reemplazar comas por puntos para manejar diferentes formatos numéricos
-            amount_text = amount_text.replace(',', '.').strip()
+            amount_text = input_text.replace(',', '.').strip()
             amount = float(amount_text)
             
             # Verificar que el monto sea positivo
@@ -482,22 +505,6 @@ async def get_payment_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Si no se puede convertir a número, mostrar error
             await update.message.reply_text(
                 "El valor ingresado no es un número válido. Por favor, ingresa solo números:",
-                reply_markup=Keyboards.get_cancel_keyboard()
-            )
-            return PAYMENT_AMOUNT
-            
-        # Manejar respuesta a las opciones ofrecidas para pagos excesivos
-        if update.message.text == f"✅ Pagar ${debt_amount:.2f} (deuda completa)":
-            # El usuario eligió pagar el monto exacto de la deuda
-            amount = debt_amount
-            await update.message.reply_text(
-                f"✅ Se ajustó el monto del pago a ${amount:.2f}, que es el valor exacto de la deuda con {to_member_name}.",
-                parse_mode="Markdown"
-            )
-        elif update.message.text == "🔄 Ingresar otro monto":
-            # El usuario quiere ingresar otro monto
-            await update.message.reply_text(
-                f"Por favor, ingresa un monto que no exceda ${debt_amount:.2f}:",
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
             return PAYMENT_AMOUNT
