@@ -539,13 +539,27 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         payment_data = context.user_data.get("payment_data", {})
         
         # Verificar acciones específicas
-        if response == "✅ Confirmar":
+        if response == "✅ Confirmar" or response == "✅ Pagar monto exacto":
             # Si el usuario confirma, obtener datos necesarios para crear el pago
             amount = payment_data.get("amount")
             from_member_id = payment_data.get("from_member_id")
             to_member_id = payment_data.get("to_member_id")
             telegram_id = payment_data.get("telegram_id")
             family_id = payment_data.get("family_id")
+            debt_amount = payment_data.get("debt_amount", 0)
+            
+            # Si el usuario eligió "Pagar monto exacto" después de un error de exceso
+            if response == "✅ Pagar monto exacto" and debt_amount > 0:
+                # Ajustar el monto al valor exacto de la deuda
+                amount = debt_amount
+                # Actualizar el monto en el contexto
+                context.user_data["payment_data"]["amount"] = amount
+                
+                # Informar al usuario del ajuste
+                await update.message.reply_text(
+                    f"✅ Se ajustó el monto del pago a ${amount:.2f}, que es el valor exacto de la deuda.",
+                    parse_mode="Markdown"
+                )
             
             # Validar que todos los datos requeridos estén presentes
             if not all([from_member_id, to_member_id, amount, family_id]):
@@ -578,8 +592,48 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 return ConversationHandler.END
             else:
-                # Si hubo un error al crear el pago, mostrar mensaje de error
-                error_message = response_data.get("error", "Error desconocido")
+                # Manejar específicamente el error de exceso de pago
+                error_message = ""
+                
+                # Verificar si response_data es un diccionario y contiene 'message'
+                if isinstance(response_data, dict) and "message" in response_data:
+                    error_message = response_data.get("message", "")
+                    
+                    # Verificar si el error menciona que el monto excede la deuda
+                    if "excede la deuda actual" in error_message and debt_amount > 0:
+                        # Extraer la deuda actual del mensaje para mayor precisión
+                        import re
+                        debt_matches = re.search(r'\(\$(\d+\.\d+)\)', error_message)
+                        if debt_matches:
+                            actual_debt = float(debt_matches.group(1))
+                            context.user_data["payment_data"]["debt_amount"] = actual_debt
+                        
+                        # Ofrecer opciones al usuario: ajustar automáticamente o cancelar
+                        keyboard = [
+                            ["✅ Pagar monto exacto"],  # Ajustar automáticamente al valor correcto
+                            ["❌ Cancelar"]             # Cancelar la operación
+                        ]
+                        
+                        await update.message.reply_text(
+                            f"⚠️ *Pago Parcial*\n\n"
+                            f"El monto del pago (${amount:.2f}) excede la deuda actual (${debt_amount:.2f}).\n\n"
+                            f"¿Deseas ajustar el monto automáticamente al valor exacto de la deuda?",
+                            parse_mode="Markdown",
+                            reply_markup=ReplyKeyboardMarkup(
+                                keyboard,
+                                one_time_keyboard=True,
+                                resize_keyboard=True
+                            )
+                        )
+                        
+                        # Permanecer en el estado de confirmación
+                        return PAYMENT_CONFIRM
+                
+                # Si no es un error de exceso de pago o no pudimos manejarlo específicamente,
+                # mostrar el error genérico
+                if not error_message:
+                    error_message = str(response_data)
+                
                 await send_error(update, context, f"Error al registrar el pago: {error_message}")
                 return ConversationHandler.END
         elif response == "❌ Cancelar":
