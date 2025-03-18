@@ -17,6 +17,7 @@ from services.family_service import FamilyService
 from services.member_service import MemberService
 from utils.context_manager import ContextManager
 from utils.helpers import send_error
+from languages.utils.translator import get_message
 
 # Importaciones de otros manejadores para las diferentes opciones del menú
 from handlers.expense_handler import crear_gasto, listar_gastos
@@ -59,13 +60,13 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Enviar un nuevo mensaje en lugar de editar
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="Preparando menú...",
+                text=get_message(telegram_id, "LOADING"),
                 reply_markup=Keyboards.remove_keyboard()
             )
         else:
             # Caso normal, es un mensaje directo
             await update.message.reply_text(
-                "Preparando menú...",
+                get_message(telegram_id, "LOADING"),
                 reply_markup=Keyboards.remove_keyboard()
             )
         
@@ -74,7 +75,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await ContextManager.load_family_members(context, family_id)
             
         # Obtener balances para mostrar resumen
-        message_menu = Messages.MAIN_MENU
+        message_menu = get_message(telegram_id, "MAIN_MENU")
         bottom_balance = ""
         
         if family_id:
@@ -129,60 +130,84 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             if is_callback:
                                 await context.bot.send_message(
                                     chat_id=chat_id,
-                                    text="❌ Error: Formato de balances no reconocido. Contacte al administrador."
+                                    text=get_message(telegram_id, "ERROR_API"),
                                 )
                             else:
                                 await update.message.reply_text(
-                                    "❌ Error: Formato de balances no reconocido. Contacte al administrador."
+                                    get_message(telegram_id, "ERROR_API"),
                                 )
                             return ConversationHandler.END
                     
                     # Crear resumen de balances para mostrar en la parte inferior
                     if debts or credits:
-                        bottom_balance = "\n\n📊 *Resumen de tu balance:*\n"
+                        # Obtener textos traducidos para el resumen de balance
+                        try:
+                            balance_summary = get_message(telegram_id, "BALANCE_SUMMARY")
+                            you_owe = get_message(telegram_id, "YOU_OWE")
+                            owe_to = get_message(telegram_id, "OWE_TO")
+                            largest_debt = get_message(telegram_id, "LARGEST_DEBT")
+                            no_debt = get_message(telegram_id, "NO_DEBT")
+                            owed_to_you = get_message(telegram_id, "OWED_TO_YOU")
+                            from_user = get_message(telegram_id, "FROM_USER")
+                            largest_credit = get_message(telegram_id, "LARGEST_CREDIT")
+                            no_credit = get_message(telegram_id, "NO_CREDIT")
+                        except Exception as e:
+                            print(f"Error obteniendo mensajes traducidos para balance: {str(e)}")
+                            # Usar valores por defecto en caso de error
+                            balance_summary = "\n\n📊 *Resumen de tu balance:*\n"
+                            you_owe = "💸 *Debes:* ${amount:.2f} en total\n"
+                            owe_to = "└ A {name}: ${amount:.2f}\n"
+                            largest_debt = "└ Mayor deuda con {name}: ${amount:.2f}\n"
+                            no_debt = "💸 *No debes dinero a nadie*\n"
+                            owed_to_you = "💰 *Te deben:* ${amount:.2f} en total\n"
+                            from_user = "└ {name}: ${amount:.2f}\n"
+                            largest_credit = "└ Mayor crédito de {name}: ${amount:.2f}\n"
+                            no_credit = "💰 *Nadie te debe dinero*\n"
+                        
+                        bottom_balance = balance_summary
                         
                         # Mostrar deudas (lo que debo)
                         if debts:
                             total_debt = sum(debt["amount"] for debt in debts)
-                            bottom_balance += f"💸 *Debes:* ${total_debt:.2f} en total\n"
+                            bottom_balance += you_owe.replace("{amount:.2f}", f"{total_debt:.2f}")
                             
                             # Mostrar detalle de la deuda más grande si hay varias
                             if len(debts) == 1:
-                                bottom_balance += f"└ A {debts[0]['name']}: ${debts[0]['amount']:.2f}\n"
+                                bottom_balance += owe_to.replace("{name}", debts[0]["name"]).replace("{amount:.2f}", f"{debts[0]['amount']:.2f}")
                             elif len(debts) > 1:
                                 # Ordenar por monto de mayor a menor
                                 debts.sort(key=lambda x: x["amount"], reverse=True)
-                                bottom_balance += f"└ Mayor deuda con {debts[0]['name']}: ${debts[0]['amount']:.2f}\n"
+                                bottom_balance += largest_debt.replace("{name}", debts[0]["name"]).replace("{amount:.2f}", f"{debts[0]['amount']:.2f}")
                         else:
-                            bottom_balance += "💸 *No debes dinero a nadie*\n"
+                            bottom_balance += no_debt
                         
                         # Mostrar créditos (lo que me deben)
                         if credits:
                             total_credit = sum(credit["amount"] for credit in credits)
-                            bottom_balance += f"💰 *Te deben:* ${total_credit:.2f} en total\n"
+                            bottom_balance += owed_to_you.replace("{amount:.2f}", f"{total_credit:.2f}")
                             
                             # Mostrar detalle del crédito más grande si hay varios
                             if len(credits) == 1:
-                                bottom_balance += f"└ {credits[0]['name']}: ${credits[0]['amount']:.2f}\n"
+                                bottom_balance += from_user.replace("{name}", credits[0]["name"]).replace("{amount:.2f}", f"{credits[0]['amount']:.2f}")
                             elif len(credits) > 1:
                                 # Ordenar por monto de mayor a menor
                                 credits.sort(key=lambda x: x["amount"], reverse=True)
-                                bottom_balance += f"└ Mayor crédito de {credits[0]['name']}: ${credits[0]['amount']:.2f}\n"
+                                bottom_balance += largest_credit.replace("{name}", credits[0]["name"]).replace("{amount:.2f}", f"{credits[0]['amount']:.2f}")
                         else:
-                            bottom_balance += "💰 *Nadie te debe dinero*\n"
+                            bottom_balance += no_credit
         
         # Mostrar el mensaje del menú principal con el teclado de opciones y resumen de balance
         if is_callback:
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=message_menu + bottom_balance,
-                reply_markup=Keyboards.get_main_menu_keyboard(),
+                reply_markup=Keyboards.get_main_menu_keyboard(telegram_id),
                 parse_mode="Markdown"
             )
         else:
             await update.message.reply_text(
                 message_menu + bottom_balance,
-                reply_markup=Keyboards.get_main_menu_keyboard(),
+                reply_markup=Keyboards.get_main_menu_keyboard(telegram_id),
                 parse_mode="Markdown"
             )
         
@@ -199,13 +224,13 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if update.callback_query:
                 await context.bot.send_message(
                     chat_id=update.callback_query.message.chat_id,
-                    text=Messages.MAIN_MENU,
-                    reply_markup=Keyboards.get_main_menu_keyboard()
+                    text=get_message(telegram_id, "MAIN_MENU"),
+                    reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
                 )
             else:
                 await update.message.reply_text(
-                    Messages.MAIN_MENU,
-                    reply_markup=Keyboards.get_main_menu_keyboard()
+                    get_message(telegram_id, "MAIN_MENU"),
+                    reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
                 )
         except Exception as e2:
             print(f"Error secundario en show_main_menu: {str(e2)}")
@@ -213,8 +238,8 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             telegram_id = str(update.effective_user.id)
             await context.bot.send_message(
                 chat_id=telegram_id,
-                text=Messages.MAIN_MENU,
-                reply_markup=Keyboards.get_main_menu_keyboard()
+                text=get_message(telegram_id, "MAIN_MENU"),
+                reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
             )
             
         return ConversationHandler.END
@@ -234,9 +259,15 @@ async def show_list_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
         int: El siguiente estado de la conversación
     """
     try:
+        # Obtener ID del usuario para traducciones
+        telegram_id = str(update.effective_user.id)
+        
+        list_records_title = get_message(telegram_id, "LIST_RECORDS_TITLE", "📜 *Listar Registros*\n\n")
+        what_records = get_message(telegram_id, "WHAT_RECORDS_TO_VIEW", "¿Qué registros quieres consultar?")
+        
         await update.message.reply_text(
-            "📜 *Listar Registros*\n\n¿Qué registros quieres consultar?",
-            reply_markup=Keyboards.get_list_options_keyboard(),
+            f"{list_records_title}{what_records}",
+            reply_markup=Keyboards.get_list_options_keyboard(telegram_id),
             parse_mode="Markdown"
         )
         return LIST_OPTION
@@ -245,9 +276,13 @@ async def show_list_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
         import traceback
         traceback.print_exc()
         
+        # Obtener ID del usuario para traducciones
+        telegram_id = str(update.effective_user.id)
+        error_message = get_message(telegram_id, "ERROR_LISTING_OPTIONS", "Error al mostrar las opciones de listado. Por favor, intenta de nuevo.")
+        
         await update.message.reply_text(
-            "Error al mostrar las opciones de listado. Por favor, intenta de nuevo.",
-            reply_markup=Keyboards.get_main_menu_keyboard()
+            error_message,
+            reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
         )
         return ConversationHandler.END
 
@@ -263,23 +298,32 @@ async def handle_list_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         int: El siguiente estado de la conversación
     """
     try:
+        # Obtener ID del usuario para traducciones
+        telegram_id = str(update.effective_user.id)
+        
         # Obtener la opción seleccionada
         option = update.message.text
+        from ui.keyboards import Keyboards  # Importación local para evitar dependencias circulares
         
         # Procesar según la opción
-        if option == "📋 Listar Gastos":
+        list_expenses_text = Keyboards.get_text(telegram_id, "LIST_EXPENSES")
+        list_payments_text = Keyboards.get_text(telegram_id, "LIST_PAYMENTS")
+        back_to_menu_text = Keyboards.get_text(telegram_id, "BACK_TO_MENU")
+        
+        if option == list_expenses_text:
             from handlers.expense_handler import listar_gastos
             return await listar_gastos(update, context)
-        elif option == "📊 Listar Pagos":
+        elif option == list_payments_text:
             from handlers.payment_handler import listar_pagos
             return await listar_pagos(update, context)
-        elif option == "↩️ Volver al Menú":
+        elif option == back_to_menu_text:
             await show_main_menu(update, context)
             return ConversationHandler.END
         else:
+            invalid_option_text = get_message(telegram_id, "ERROR_INVALID_OPTION", "Opción no válida. Por favor, selecciona una opción del menú:")
             await update.message.reply_text(
-                "Opción no válida. Por favor, selecciona una opción del menú:",
-                reply_markup=Keyboards.get_list_options_keyboard()
+                invalid_option_text,
+                reply_markup=Keyboards.get_list_options_keyboard(telegram_id)
             )
             return LIST_OPTION
     except Exception as e:
@@ -287,9 +331,13 @@ async def handle_list_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         import traceback
         traceback.print_exc()
         
+        # Obtener ID del usuario para traducciones
+        telegram_id = str(update.effective_user.id)
+        error_message = get_message(telegram_id, "ERROR_PROCESSING_OPTION", "Error al procesar la opción seleccionada. Por favor, intenta de nuevo.")
+        
         await update.message.reply_text(
-            "Error al procesar la opción seleccionada. Por favor, intenta de nuevo.",
-            reply_markup=Keyboards.get_main_menu_keyboard()
+            error_message,
+            reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
         )
         return ConversationHandler.END
 
@@ -393,9 +441,14 @@ async def handle_unknown_text(update: Update, context: ContextTypes.DEFAULT_TYPE
     Returns:
         int: The next conversation state
     """
+    # Obtener ID del usuario para traducciones
+    telegram_id = str(update.effective_user.id)
+    
     # Mostrar mensaje informativo y el menú principal
+    unknown_command_text = get_message(telegram_id, "UNKNOWN_COMMAND", "No entiendo ese comando. Aquí tienes el menú principal:")
+    
     await update.message.reply_text(
-        "No entiendo ese comando. Aquí tienes el menú principal:",
-        reply_markup=Keyboards.get_main_menu_keyboard()
+        unknown_command_text,
+        reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
     )
     return ConversationHandler.END 

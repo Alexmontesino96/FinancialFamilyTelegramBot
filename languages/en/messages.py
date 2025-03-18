@@ -150,9 +150,19 @@ class Messages:
     LOADING = "⏳ Loading..."
     FAMILY_INFO = "ℹ️ *Family Information*\n\n*Name:* {name}\n*Family ID:* `{id}`\n*Members:* {members_count}\n\n*Members:*\n{members_list}"
     FAMILY_INVITATION = "🔗 *Family Invitation*\n\n*Name:* {name}\n*ID:* `{id}`\n\nShare this ID with the people you want to invite to your family."
+    UNKNOWN_COMMAND = "I don't understand that command. Here's the main menu:"
     
     # Messages for balances
     BALANCES_HEADER = "💰 *Family Balances*\n\n"
+    BALANCE_SUMMARY = "\n\n📊 *Your balance summary:*\n"
+    YOU_OWE = "💸 *You owe:* ${amount:.2f} in total\n"
+    OWE_TO = "└ To {name}: ${amount:.2f}\n"
+    LARGEST_DEBT = "└ Largest debt to {name}: ${amount:.2f}\n"
+    NO_DEBT = "💸 *You don't owe money to anyone*\n"
+    OWED_TO_YOU = "💰 *Owed to you:* ${amount:.2f} in total\n"
+    FROM_USER = "└ {name}: ${amount:.2f}\n"
+    LARGEST_CREDIT = "└ Largest credit from {name}: ${amount:.2f}\n"
+    NO_CREDIT = "💰 *No one owes you money*\n"
     
     # Messages for sharing invitation
     SHARE_INVITATION_INTRO = "🔗 Share this link to invite someone to join your family:"
@@ -175,4 +185,43 @@ class Messages:
     
     # Messages specific to the language system
     LANGUAGE_SELECTION = "🌍 Select your preferred language:"
-    LANGUAGE_UPDATED = "✅ Language updated to English!" 
+    LANGUAGE_UPDATED = "✅ Language updated to English!"
+    
+    # Messages for keyboards
+    KB_VIEW_BALANCES = "💰 View Balances"
+    KB_CREATE_EXPENSE = "💸 Create Expense"
+    KB_LIST_RECORDS = "📜 List Records"
+    KB_REGISTER_PAYMENT = "💳 Register Payment"
+    KB_EDIT_DELETE = "✏️ Edit/Delete"
+    KB_FAMILY_INFO = "ℹ️ Family Info"
+    KB_SHARE_INVITATION = "🔗 Share Invitation"
+    KB_CHANGE_LANGUAGE = "🌍 Change Language"
+    KB_EDIT_EXPENSES = "📝 Edit Expenses"
+    KB_DELETE_EXPENSES = "🗑️ Delete Expenses"
+    KB_EDIT_PAYMENTS = "📝 Edit Payments"
+    KB_DELETE_PAYMENTS = "🗑️ Delete Payments"
+    KB_BACK_TO_MENU = "↩️ Back to Menu"
+    KB_CREATE_FAMILY = "🏠 Create Family"
+    KB_JOIN_FAMILY = "🔗 Join Family"
+    KB_CONFIRM = "✅ Confirm"
+    KB_CANCEL = "❌ Cancel"
+    KB_LIST_EXPENSES = "📋 List Expenses"
+    KB_LIST_PAYMENTS = "📊 List Payments"
+    
+    # Messages for listing records
+    LIST_RECORDS_TITLE = "📜 *List Records*\n\n"
+    WHAT_RECORDS_TO_VIEW = "Which records would you like to view?"
+    ERROR_LISTING_OPTIONS = "Error displaying listing options. Please try again."
+    ERROR_PROCESSING_OPTION = "Error processing the selected option. Please try again."
+    
+    # Messages for balances
+    BALANCES_HEADER = "💰 *Family Balances*\n\n"
+    BALANCE_SUMMARY = "\n\n📊 *Your balance summary:*\n"
+    YOU_OWE = "💸 *You owe:* ${amount:.2f} in total\n"
+    OWE_TO = "└ To {name}: ${amount:.2f}\n"
+    LARGEST_DEBT = "└ Largest debt to {name}: ${amount:.2f}\n"
+    NO_DEBT = "💸 *You don't owe money to anyone*\n"
+    OWED_TO_YOU = "💰 *Owed to you:* ${amount:.2f} in total\n"
+    FROM_USER = "└ {name}: ${amount:.2f}\n"
+    LARGEST_CREDIT = "└ Largest credit from {name}: ${amount:.2f}\n"
+    NO_CREDIT = "💰 *No one owes you money*\n" 

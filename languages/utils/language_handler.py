@@ -7,7 +7,6 @@ de idioma en Telegram.
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from ui.keyboards import Keyboards
 
 from languages.utils.translator import SUPPORTED_LANGUAGES, set_language, get_message
 
@@ -95,7 +94,7 @@ async def language_selection_handler(update: Update, context: ContextTypes.DEFAU
     # Para depuración
     print(f"Cambiando idioma a: {lang_code}")
     
-    # Establecer idioma
+    # Establecer idioma (local y en la API)
     if set_language(user_id, lang_code):
         # Obtener el nombre del idioma para la confirmación
         language_name = SUPPORTED_LANGUAGES[lang_code]
@@ -120,10 +119,13 @@ async def language_selection_handler(update: Update, context: ContextTypes.DEFAU
     # Enviar directamente un nuevo mensaje con el menú principal
     chat_id = update.callback_query.message.chat_id
     try:
+        # Importar Keyboards localmente para evitar la dependencia circular
+        from ui.keyboards import Keyboards
+        
         await context.bot.send_message(
             chat_id=chat_id,
             text=get_message(user_id, "MAIN_MENU"),
-            reply_markup=Keyboards.get_main_menu_keyboard(),
+            reply_markup=Keyboards.get_main_menu_keyboard(user_id),
             parse_mode="Markdown"
         )
     except Exception as e:
@@ -138,6 +140,9 @@ def get_language_handlers():
     Returns:
         Lista de manejadores para registrar en el bot.
     """
+    # Importar los módulos necesarios localmente para evitar dependencias circulares
+    from ui.keyboards import Keyboards
+    
     # Handler independiente para el callback
     callback_handler = CallbackQueryHandler(language_selection_handler, pattern=r"^lang_")
     
@@ -145,7 +150,7 @@ def get_language_handlers():
     language_conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("language", language_command),
-            MessageHandler(filters.Regex("^🌍 Cambiar Idioma$"), language_command)
+            MessageHandler(filters.Regex(f"^{Keyboards.DEFAULT_TEXTS['CHANGE_LANGUAGE']}$"), language_command)
         ],
         states={
             SELECTING_LANGUAGE: [

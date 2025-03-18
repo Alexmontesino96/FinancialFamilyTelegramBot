@@ -150,9 +150,19 @@ class Messages:
     LOADING = "⏳ Cargando..."
     FAMILY_INFO = "ℹ️ *Información de la Familia*\n\n*Nombre:* {name}\n*ID de Familia:* `{id}`\n*Miembros:* {members_count}\n\n*Miembros:*\n{members_list}"
     FAMILY_INVITATION = "🔗 *Invitación a la Familia*\n\n*Nombre:* {name}\n*ID:* `{id}`\n\nComparte este ID con las personas que quieras invitar a tu familia."
+    UNKNOWN_COMMAND = "No entiendo ese comando. Aquí tienes el menú principal:"
     
     # Mensajes para balances
     BALANCES_HEADER = "💰 *Balances de la familia*\n\n"
+    BALANCE_SUMMARY = "\n\n📊 *Resumen de tu balance:*\n"
+    YOU_OWE = "💸 *Debes:* ${amount:.2f} en total\n"
+    OWE_TO = "└ A {name}: ${amount:.2f}\n"
+    LARGEST_DEBT = "└ Mayor deuda con {name}: ${amount:.2f}\n"
+    NO_DEBT = "💸 *No debes dinero a nadie*\n"
+    OWED_TO_YOU = "💰 *Te deben:* ${amount:.2f} en total\n"
+    FROM_USER = "└ {name}: ${amount:.2f}\n"
+    LARGEST_CREDIT = "└ Mayor crédito de {name}: ${amount:.2f}\n"
+    NO_CREDIT = "💰 *Nadie te debe dinero*\n"
     
     # Mensajes para compartir invitación
     SHARE_INVITATION_INTRO = "🔗 Comparte este enlace para invitar a alguien a unirse a tu familia:"
@@ -175,4 +185,33 @@ class Messages:
     
     # Mensajes específicos del sistema de idiomas
     LANGUAGE_SELECTION = "🌍 Selecciona tu idioma preferido:"
-    LANGUAGE_UPDATED = "✅ ¡Idioma actualizado a Español!" 
+    LANGUAGE_UPDATED = "✅ ¡Idioma actualizado a Español!"
+    
+    # Mensajes para teclados
+    KB_VIEW_BALANCES = "💰 Ver Balances"
+    KB_CREATE_EXPENSE = "💸 Crear Gasto"
+    KB_LIST_RECORDS = "📜 Listar Registros"
+    KB_REGISTER_PAYMENT = "💳 Registrar Pago"
+    KB_EDIT_DELETE = "✏️ Editar/Eliminar"
+    KB_FAMILY_INFO = "ℹ️ Info Familia"
+    KB_SHARE_INVITATION = "🔗 Compartir Invitación"
+    KB_CHANGE_LANGUAGE = "🌍 Cambiar Idioma"
+    KB_EDIT_EXPENSES = "📝 Editar Gastos"
+    KB_DELETE_EXPENSES = "🗑️ Eliminar Gastos"
+    KB_EDIT_PAYMENTS = "📝 Editar Pagos"
+    KB_DELETE_PAYMENTS = "🗑️ Eliminar Pagos"
+    KB_BACK_TO_MENU = "↩️ Volver al Menú"
+    KB_CREATE_FAMILY = "🏠 Crear Familia"
+    KB_JOIN_FAMILY = "🔗 Unirse a Familia"
+    KB_CONFIRM = "✅ Confirmar"
+    KB_CANCEL = "❌ Cancelar"
+    KB_LIST_EXPENSES = "📋 Listar Gastos"
+    KB_LIST_PAYMENTS = "📊 Listar Pagos"
+    
+    # Mensajes para listar registros
+    LIST_RECORDS_TITLE = "📜 *Listar Registros*\n\n"
+    WHAT_RECORDS_TO_VIEW = "¿Qué registros quieres consultar?"
+    ERROR_LISTING_OPTIONS = "Error al mostrar las opciones de listado. Por favor, intenta de nuevo."
+    ERROR_PROCESSING_OPTION = "Error al procesar la opción seleccionada. Por favor, intenta de nuevo."
+    
+    # Mensajes para balances 

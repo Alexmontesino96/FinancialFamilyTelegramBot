@@ -15,6 +15,20 @@ SUPPORTED_LANGUAGES = {
     "fr": "Français"
 }
 
+# Mapeo de códigos de idioma del bot a la API
+BOT_TO_API_LANGUAGE = {
+    "es": "ES",
+    "en": "EN",
+    "fr": "FR"
+}
+
+# Mapeo de códigos de idioma de la API al bot
+API_TO_BOT_LANGUAGE = {
+    "ES": "es",
+    "EN": "en",
+    "FR": "fr"
+}
+
 # Idioma por defecto
 DEFAULT_LANGUAGE = "es"
 
@@ -54,7 +68,7 @@ class LanguageManager:
     
     def set_user_language(self, user_id: str, language_code: str) -> bool:
         """
-        Establece el idioma preferido para un usuario.
+        Establece el idioma preferido para un usuario localmente.
         
         Args:
             user_id: ID del usuario en Telegram.
@@ -158,16 +172,68 @@ def get_message(user_id: str, message_key: str, **kwargs) -> str:
 
 def set_language(user_id: str, language_code: str) -> bool:
     """
-    Función de conveniencia para establecer el idioma de un usuario.
+    Función para establecer el idioma de un usuario y sincronizarlo con la API.
     
     Args:
         user_id: ID del usuario en Telegram.
-        language_code: Código del idioma a establecer.
+        language_code: Código del idioma a establecer (en minúsculas: es, en, fr).
         
     Returns:
         True si se estableció correctamente, False si el idioma no es soportado.
     """
-    return translator.set_user_language(user_id, language_code)
+    # Establecer el idioma localmente
+    local_success = translator.set_user_language(user_id, language_code)
+    
+    # Si se estableció correctamente, actualizar también en la API
+    if local_success:
+        try:
+            # Importar aquí para evitar dependencias circulares
+            from services.member_service import MemberService
+            
+            # Convertir el código de idioma al formato de la API (mayúsculas)
+            api_language_code = BOT_TO_API_LANGUAGE.get(language_code)
+            
+            # Actualizar en la API
+            MemberService.update_member(user_id, {"language": api_language_code})
+            print(f"Idioma actualizado en la API: {user_id} -> {api_language_code}")
+        except Exception as e:
+            print(f"Error al actualizar idioma en la API: {str(e)}")
+            # Continuamos con el éxito local aunque falle la API
+    
+    return local_success
+
+def load_language_from_api(user_id: str) -> str:
+    """
+    Carga el idioma preferido del usuario desde la API y lo establece localmente.
+    
+    Args:
+        user_id: ID del usuario en Telegram.
+        
+    Returns:
+        Código de idioma cargado (en minúsculas: es, en, fr).
+    """
+    try:
+        # Importar aquí para evitar dependencias circulares
+        from services.member_service import MemberService
+        
+        # Obtener información del miembro
+        status_code, member = MemberService.get_member(user_id)
+        
+        if status_code == 200 and member and "language" in member:
+            # Convertir el código de idioma de la API al formato del bot (minúsculas)
+            api_language = member["language"]
+            bot_language = API_TO_BOT_LANGUAGE.get(api_language, DEFAULT_LANGUAGE)
+            
+            # Establecer localmente
+            translator.set_user_language(user_id, bot_language)
+            print(f"Idioma cargado desde la API: {user_id} -> {bot_language}")
+            
+            return bot_language
+    except Exception as e:
+        print(f"Error al cargar idioma desde la API: {str(e)}")
+    
+    # Si hay algún error, devolver el idioma por defecto
+    return DEFAULT_LANGUAGE
 
 def get_supported_languages() -> Dict[str, str]:
     """

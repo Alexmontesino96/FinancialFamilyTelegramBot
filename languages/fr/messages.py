@@ -150,9 +150,19 @@ class Messages:
     LOADING = "⏳ Chargement..."
     FAMILY_INFO = "ℹ️ *Informations sur la famille*\n\n*Nom :* {name}\n*ID de Famille :* `{id}`\n*Membres :* {members_count}\n\n*Membres :*\n{members_list}"
     FAMILY_INVITATION = "🔗 *Invitation à la famille*\n\n*Nom :* {name}\n*ID :* `{id}`\n\nPartagez cet ID avec les personnes que vous souhaitez inviter dans votre famille."
+    UNKNOWN_COMMAND = "Je ne comprends pas cette commande. Voici le menu principal :"
     
     # Messages pour les soldes
     BALANCES_HEADER = "💰 *Soldes de la famille*\n\n"
+    BALANCE_SUMMARY = "\n\n📊 *Résumé de votre solde :*\n"
+    YOU_OWE = "💸 *Vous devez :* ${amount:.2f} au total\n"
+    OWE_TO = "└ À {name} : ${amount:.2f}\n"
+    LARGEST_DEBT = "└ Plus grande dette envers {name} : ${amount:.2f}\n"
+    NO_DEBT = "💸 *Vous ne devez d'argent à personne*\n"
+    OWED_TO_YOU = "💰 *On vous doit :* ${amount:.2f} au total\n"
+    FROM_USER = "└ {name} : ${amount:.2f}\n"
+    LARGEST_CREDIT = "└ Plus grand crédit de {name} : ${amount:.2f}\n"
+    NO_CREDIT = "💰 *Personne ne vous doit d'argent*\n"
     
     # Messages pour partager une invitation
     SHARE_INVITATION_INTRO = "🔗 Partagez ce lien pour inviter quelqu'un à rejoindre votre famille :"
@@ -175,4 +185,87 @@ class Messages:
     
     # Messages spécifiques au système de langues
     LANGUAGE_SELECTION = "🌍 Sélectionnez votre langue préférée :"
-    LANGUAGE_UPDATED = "✅ Langue mise à jour en Français !" 
+    LANGUAGE_UPDATED = "✅ Langue mise à jour en Français !"
+    
+    # Messages pour les claviers
+    KB_VIEW_BALANCES = "💰 Voir Soldes"
+    KB_CREATE_EXPENSE = "💸 Créer Dépense"
+    KB_LIST_RECORDS = "📜 Lister Enregistrements"
+    KB_REGISTER_PAYMENT = "💳 Enregistrer Paiement"
+    KB_EDIT_DELETE = "✏️ Modifier/Supprimer"
+    KB_FAMILY_INFO = "ℹ️ Info Famille"
+    KB_SHARE_INVITATION = "🔗 Partager Invitation"
+    KB_CHANGE_LANGUAGE = "🌍 Changer Langue"
+    KB_EDIT_EXPENSES = "📝 Modifier Dépenses"
+    KB_DELETE_EXPENSES = "🗑️ Supprimer Dépenses"
+    KB_EDIT_PAYMENTS = "📝 Modifier Paiements"
+    KB_DELETE_PAYMENTS = "🗑️ Supprimer Paiements"
+    KB_BACK_TO_MENU = "↩️ Retour au Menu"
+    KB_CREATE_FAMILY = "🏠 Créer Famille"
+    KB_JOIN_FAMILY = "🔗 Rejoindre Famille"
+    KB_CONFIRM = "✅ Confirmer"
+    KB_CANCEL = "❌ Annuler"
+    KB_LIST_EXPENSES = "📋 Lister Dépenses"
+    KB_LIST_PAYMENTS = "📊 Lister Paiements"
+    
+    # Messages pour lister les enregistrements
+    LIST_RECORDS_TITLE = "📜 *Lister les Enregistrements*\n\n"
+    WHAT_RECORDS_TO_VIEW = "Quels enregistrements souhaitez-vous consulter ?"
+    ERROR_LISTING_OPTIONS = "Erreur lors de l'affichage des options de liste. Veuillez réessayer."
+    ERROR_PROCESSING_OPTION = "Erreur lors du traitement de l'option sélectionnée. Veuillez réessayer."
+    
+    # Messages pour les soldes
+    BALANCES_HEADER = "💰 *Soldes de la famille*\n\n"
+    BALANCE_SUMMARY = "\n\n📊 *Résumé de votre solde :*\n"
+    YOU_OWE = "💸 *Vous devez :* ${amount:.2f} au total\n"
+    OWE_TO = "└ À {name} : ${amount:.2f}\n"
+    LARGEST_DEBT = "└ Plus grande dette envers {name} : ${amount:.2f}\n"
+    NO_DEBT = "💸 *Vous ne devez d'argent à personne*\n"
+    OWED_TO_YOU = "💰 *On vous doit :* ${amount:.2f} au total\n"
+    FROM_USER = "└ {name} : ${amount:.2f}\n"
+    LARGEST_CREDIT = "└ Plus grand crédit de {name} : ${amount:.2f}\n"
+    NO_CREDIT = "💰 *Personne ne vous doit d'argent*\n"
+    
+    # Messages pour partager une invitation
+    SHARE_INVITATION_INTRO = "🔗 Partagez ce lien pour inviter quelqu'un à rejoindre votre famille :"
+    
+    SHARE_INVITATION_ID = "📝 ID de famille : `{family_id}`\n\nPartagez cet ID avec qui vous voulez qui rejoigne votre famille."
+    
+    SHARE_INVITATION_QR = "Ils peuvent également scanner ce code QR :"
+    
+    # Message pour le lien d'invitation
+    INVITATION_LINK = (
+        "🔗 *Invitation à la Famille*\n\n"
+        "Partagez ce code QR ou le lien suivant pour inviter quelqu'un à rejoindre votre famille :\n\n"
+        "`{invite_link}`\n\n"
+        "Instructions pour l'invité :\n"
+        "1. Cliquez sur le lien ou scannez le code QR\n"
+        "2. Le bot s'ouvrira\n"
+        "3. Appuyez sur le bouton 'DÉMARRER' ou envoyez /start\n"
+        "4. Vous serez automatiquement ajouté à la famille"
+    )
+    
+    # Messages spécifiques au système de langues
+    LANGUAGE_SELECTION = "🌍 Sélectionnez votre langue préférée :"
+    LANGUAGE_UPDATED = "✅ Langue mise à jour en Français !"
+    
+    # Messages pour les claviers
+    KB_VIEW_BALANCES = "💰 Voir Soldes"
+    KB_CREATE_EXPENSE = "💸 Créer Dépense"
+    KB_LIST_RECORDS = "📜 Lister Enregistrements"
+    KB_REGISTER_PAYMENT = "💳 Enregistrer Paiement"
+    KB_EDIT_DELETE = "✏️ Modifier/Supprimer"
+    KB_FAMILY_INFO = "ℹ️ Info Famille"
+    KB_SHARE_INVITATION = "🔗 Partager Invitation"
+    KB_CHANGE_LANGUAGE = "🌍 Changer Langue"
+    KB_EDIT_EXPENSES = "📝 Modifier Dépenses"
+    KB_DELETE_EXPENSES = "🗑️ Supprimer Dépenses"
+    KB_EDIT_PAYMENTS = "📝 Modifier Paiements"
+    KB_DELETE_PAYMENTS = "🗑️ Supprimer Paiements"
+    KB_BACK_TO_MENU = "↩️ Retour au Menu"
+    KB_CREATE_FAMILY = "🏠 Créer Famille"
+    KB_JOIN_FAMILY = "🔗 Rejoindre Famille"
+    KB_CONFIRM = "✅ Confirmer"
+    KB_CANCEL = "❌ Annuler"
+    KB_LIST_EXPENSES = "📋 Lister Dépenses"
+    KB_LIST_PAYMENTS = "📊 Lister Paiements" 

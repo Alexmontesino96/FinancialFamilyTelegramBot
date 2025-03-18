@@ -47,7 +47,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     username = update.effective_user.username or "sin username"
+    telegram_id = str(user_id)
     logger.info(f"[START] Usuario {user_id} (@{username}) ha ejecutado el comando /start")
+    
+    # Cargar el idioma del usuario desde la API
+    try:
+        from languages.utils.translator import load_language_from_api
+        language = load_language_from_api(telegram_id)
+        logger.info(f"[START] Idioma cargado para usuario {user_id}: {language}")
+    except Exception as e:
+        logger.error(f"[START] Error al cargar idioma para usuario {user_id}: {str(e)}")
     
     if context.args:  # Si hay argumentos, manejar enlace profundo
         logger.info(f"[START] Usuario {user_id} tiene argumentos: {context.args}")
