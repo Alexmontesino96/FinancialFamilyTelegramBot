@@ -15,6 +15,7 @@ from services.family_service import FamilyService
 from utils.context_manager import ContextManager
 from utils.helpers import send_error, create_qr_code
 import traceback
+from languages.utils.translator import get_message
 
 # Eliminamos la importación circular
 # from handlers.menu_handler import show_main_menu
@@ -156,13 +157,16 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Formatear los balances para mostrarlos al usuario, pasando los nombres de los miembros
         # y el ID del miembro actual para que aparezca primero
-        formatted_balances = Formatters.format_balances(balances, member_names, current_member_id)
+        formatted_balances = Formatters.format_balances(balances, member_names, current_member_id, telegram_id)
+        
+        # Obtener el título de balances traducido
+        balances_header = get_message(telegram_id, "BALANCES_HEADER")
         
         # Mostrar los balances al usuario
         await update.message.reply_text(
-            Messages.BALANCES_HEADER + formatted_balances,
+            balances_header + formatted_balances,
             parse_mode="Markdown",
-            reply_markup=Keyboards.get_main_menu_keyboard()
+            reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
         )
         
         # Ya hemos mostrado el menú principal con los balances, finalizar

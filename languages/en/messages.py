@@ -154,6 +154,16 @@ class Messages:
     
     # Messages for balances
     BALANCES_HEADER = "💰 *Family Balances*\n\n"
+    
+    # Balance formatting elements
+    BALANCE_NET = "Net balance"
+    BALANCE_TOTAL_FAVOR = "Total in your favor"
+    BALANCE_TOTAL_DEBT = "Total debt"
+    BALANCE_DEBTS = "Debts"
+    BALANCE_CREDITS = "Credits"
+    BALANCE_NO_DEBT = "Doesn't owe anyone"
+    BALANCE_NO_CREDIT = "No one owes them"
+    
     BALANCE_SUMMARY = "\n\n📊 *Your balance summary:*\n"
     YOU_OWE = "💸 *You owe:* ${amount:.2f} in total\n"
     OWE_TO = "└ To {name}: ${amount:.2f}\n"

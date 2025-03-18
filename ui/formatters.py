@@ -214,7 +214,7 @@ class Formatters:
         return "\n\n" + "\n\n".join(result)
     
     @staticmethod
-    def format_balances(balances, member_names=None, current_member_id=None):
+    def format_balances(balances, member_names=None, current_member_id=None, telegram_id=None):
         """Formatea los balances para mostrar en Telegram según el esquema de la API.
         
         La API devuelve los balances en formato de lista de balances por miembro
@@ -225,6 +225,7 @@ class Formatters:
             member_names: Diccionario de ID -> nombre (opcional, ya que los nombres 
                           vienen incluidos en la respuesta de la API)
             current_member_id: ID del miembro actual que realiza la consulta (para mostrarlo primero)
+            telegram_id: ID de Telegram del usuario para obtener mensajes traducidos
         """
         print(f"Formateando balances")
         
@@ -239,15 +240,17 @@ class Formatters:
         # Determinar el formato de los balances por la presencia de campos específicos
         if isinstance(balances, list) and len(balances) > 0 and isinstance(balances[0], dict):
             if "member_id" in balances[0] and "debts" in balances[0] and "credits" in balances[0]:
-                return Formatters._format_member_balances(balances, member_names, current_member_id)
+                return Formatters._format_member_balances(balances, member_names, current_member_id, telegram_id)
         
         # Si no se puede determinar el formato, mostrar mensaje de error
         print(f"Formato de balances no reconocido")
         return "Formato de balances no reconocido. Por favor contacte al administrador."
     
     @staticmethod
-    def _format_member_balances(balances, member_names, current_member_id=None):
+    def _format_member_balances(balances, member_names, current_member_id=None, telegram_id=None):
         """Formatea los balances por miembro, mostrando primero al usuario actual."""
+        from languages.utils.translator import get_message
+        
         result = []
         current_member_balance = None
         other_members_balances = []
@@ -265,6 +268,28 @@ class Formatters:
                 member_id = balance.get('member_id')
                 member_name = balance.get('name', 'Desconocido')
                 
+                # Obtener textos traducidos si se proporcionó telegram_id
+                balance_texts = {
+                    'net': "Balance neto",
+                    'favor': "Total a favor",
+                    'debt': "Total a deber",
+                    'debts': "Deudas",
+                    'credits': "Créditos",
+                    'no_debt': "No debe a nadie",
+                    'no_credit': "Nadie le debe"
+                }
+                
+                if telegram_id:
+                    balance_texts = {
+                        'net': get_message(telegram_id, "BALANCE_NET"),
+                        'favor': get_message(telegram_id, "BALANCE_TOTAL_FAVOR"),
+                        'debt': get_message(telegram_id, "BALANCE_TOTAL_DEBT"),
+                        'debts': get_message(telegram_id, "BALANCE_DEBTS"),
+                        'credits': get_message(telegram_id, "BALANCE_CREDITS"),
+                        'no_debt': get_message(telegram_id, "BALANCE_NO_DEBT"),
+                        'no_credit': get_message(telegram_id, "BALANCE_NO_CREDIT")
+                    }
+                
                 # Formatear deudas (lo que debe a otros)
                 debts = balance.get('debts', [])
                 if debts and len(debts) > 0 and isinstance(debts, list):
@@ -281,7 +306,7 @@ class Formatters:
                         debts_list.append(f"• {to_name}: ${d.get('amount', 0):.2f}")
                     debts_text = "\n".join(debts_list)
                 else:
-                    debts_text = "• No debe a nadie"
+                    debts_text = f"• {balance_texts['no_debt']}"
                 
                 # Formatear créditos (lo que le deben)
                 credits = balance.get('credits', [])
@@ -299,7 +324,7 @@ class Formatters:
                         credits_list.append(f"• {from_name}: ${c.get('amount', 0):.2f}")
                     credits_text = "\n".join(credits_list)
                 else:
-                    credits_text = "• Nadie le debe"
+                    credits_text = f"• {balance_texts['no_credit']}"
                 
                 # Formatear el balance con emojis según si es positivo, negativo o cero
                 net_balance = balance.get('net_balance', 0)
@@ -323,11 +348,11 @@ class Formatters:
                 # Construir el mensaje completo para este miembro
                 member_text = (
                     f"👤 {formatted_name}\n"
-                    f"{balance_emoji} Balance neto: *${net_balance:.2f}*\n"
-                    f"💰 Total a favor: *${balance.get('total_owed', 0):.2f}*\n"
-                    f"💸 Total a deber: *${balance.get('total_debt', 0):.2f}*\n\n"
-                    f"*Deudas:*\n{debts_text}\n\n"
-                    f"*Créditos:*\n{credits_text}"
+                    f"{balance_emoji} {balance_texts['net']}: *${net_balance:.2f}*\n"
+                    f"💰 {balance_texts['favor']}: *${balance.get('total_owed', 0):.2f}*\n"
+                    f"💸 {balance_texts['debt']}: *${balance.get('total_debt', 0):.2f}*\n\n"
+                    f"*{balance_texts['debts']}:*\n{debts_text}\n\n"
+                    f"*{balance_texts['credits']}:*\n{credits_text}"
                 )
                 
                 # Determinar si este es el miembro actual o no

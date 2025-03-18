@@ -154,6 +154,16 @@ class Messages:
     
     # Mensajes para balances
     BALANCES_HEADER = "💰 *Balances de la familia*\n\n"
+    
+    # Elementos de formato para balances
+    BALANCE_NET = "Balance neto"
+    BALANCE_TOTAL_FAVOR = "Total a favor"
+    BALANCE_TOTAL_DEBT = "Total a deber"
+    BALANCE_DEBTS = "Deudas"
+    BALANCE_CREDITS = "Créditos"
+    BALANCE_NO_DEBT = "No debe a nadie"
+    BALANCE_NO_CREDIT = "Nadie le debe"
+    
     BALANCE_SUMMARY = "\n\n📊 *Resumen de tu balance:*\n"
     YOU_OWE = "💸 *Debes:* ${amount:.2f} en total\n"
     OWE_TO = "└ A {name}: ${amount:.2f}\n"
@@ -212,6 +222,4 @@ class Messages:
     LIST_RECORDS_TITLE = "📜 *Listar Registros*\n\n"
     WHAT_RECORDS_TO_VIEW = "¿Qué registros quieres consultar?"
     ERROR_LISTING_OPTIONS = "Error al mostrar las opciones de listado. Por favor, intenta de nuevo."
-    ERROR_PROCESSING_OPTION = "Error al procesar la opción seleccionada. Por favor, intenta de nuevo."
-    
-    # Mensajes para balances 
+    ERROR_PROCESSING_OPTION = "Error al procesar la opción seleccionada. Por favor, intenta de nuevo." 
