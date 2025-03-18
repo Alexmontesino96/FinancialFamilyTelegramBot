@@ -141,6 +141,7 @@ class Messages:
     
     # Mensajes generales
     CANCEL_OPERATION = "❌ Operación cancelada."
+    OPERATION_CANCELED = "❌ Operación cancelada."
     LOADING = "⏳ Cargando..."
     FAMILY_INFO = "ℹ️ *Información de la familia*\n\n*Nombre:* {name}\n*ID de Familia:* `{id}`\n*Miembros:* {members_count}\n\n*Miembros:*\n{members_list}"
     FAMILY_INVITATION = "🔗 *Invitación a la familia*\n\n*Nombre:* {name}\n*ID:* `{id}`\n\nComparte este ID con las personas que quieras invitar a tu familia."

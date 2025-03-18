@@ -262,8 +262,8 @@ async def show_list_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Obtener ID del usuario para traducciones
         telegram_id = str(update.effective_user.id)
         
-        list_records_title = get_message(telegram_id, "LIST_RECORDS_TITLE", "📜 *Listar Registros*\n\n")
-        what_records = get_message(telegram_id, "WHAT_RECORDS_TO_VIEW", "¿Qué registros quieres consultar?")
+        list_records_title = get_message(telegram_id, "LIST_RECORDS_TITLE")
+        what_records = get_message(telegram_id, "WHAT_RECORDS_TO_VIEW")
         
         await update.message.reply_text(
             f"{list_records_title}{what_records}",
@@ -278,7 +278,7 @@ async def show_list_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Obtener ID del usuario para traducciones
         telegram_id = str(update.effective_user.id)
-        error_message = get_message(telegram_id, "ERROR_LISTING_OPTIONS", "Error al mostrar las opciones de listado. Por favor, intenta de nuevo.")
+        error_message = get_message(telegram_id, "ERROR_LISTING_OPTIONS")
         
         await update.message.reply_text(
             error_message,
