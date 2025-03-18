@@ -305,7 +305,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                 )
                 return ConversationHandler.END
             
-            # Guardar la lista de miembros en el contexto para uso futuro
+            # Guardar la lista completa de miembros en el contexto para uso futuro
             context.user_data["family_members"] = members
             
             # Actualizar la caché de nombres con todos los miembros
@@ -318,15 +318,27 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                 if member_id:
                     context.user_data["member_names"][str(member_id)] = member_name
             
-            # Preseleccionar al usuario actual
-            preselected_ids = [str(current_member_id)] if current_member_id else []
-            expense_data["selected_members"] = preselected_ids
+            # Filtrar los miembros para excluir al creador del gasto
+            filtered_members = [member for member in members if str(member.get("id")) != str(current_member_id)]
+            
+            # Inicializar la lista de miembros seleccionados (sin incluir al creador)
+            # El creador siempre se incluirá automáticamente al final
+            selected_members = []
+            expense_data["selected_members"] = selected_members
             context.user_data["expense_data"] = expense_data
             
-            # Mostrar el teclado de selección de miembros
+            # Mostrar mensaje explicativo y el teclado de selección de miembros
+            message = (
+                "👥 Selecciona los miembros que compartirán este gasto:\n\n"
+                "Toca sobre un nombre para seleccionar/deseleccionar\n"
+                "- Los nombres con ✅ están seleccionados\n"
+                "- Los nombres con ⬜ no están seleccionados\n\n"
+                "🔹 Tú siempre estás incluido automáticamente en el gasto\n\n"
+                "Cuando termines, presiona \"✓ Continuar\""
+            )
             await update.message.reply_text(
-                Messages.CREATE_EXPENSE_SELECT_MEMBERS,
-                reply_markup=Keyboards.get_select_members_keyboard(members, preselected_ids)
+                message,
+                reply_markup=Keyboards.get_select_members_keyboard(filtered_members, selected_members)
             )
             
             # Mantener el mismo estado para permitir la selección de miembros
@@ -350,6 +362,9 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             else:
                 members = context.user_data["family_members"]
             
+            # Filtrar para excluir al creador
+            filtered_members = [member for member in members if str(member.get("id")) != str(current_member_id)]
+            
             # Obtener la lista actual de miembros seleccionados
             selected_members = expense_data.get("selected_members", [])
             
@@ -357,7 +372,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             member_name = selection[2:].strip()  # Quitar el prefijo (✅ o ⬜)
             selected_member_id = None
             
-            for member in members:
+            for member in filtered_members:
                 if member.get("name") == member_name:
                     selected_member_id = str(member.get("id"))
                     break
@@ -376,7 +391,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                 # Mostrar el teclado actualizado
                 await update.message.reply_text(
                     "Selección actualizada. Continúa seleccionando miembros o presiona \"✓ Continuar\" cuando termines.",
-                    reply_markup=Keyboards.get_select_members_keyboard(members, selected_members)
+                    reply_markup=Keyboards.get_select_members_keyboard(filtered_members, selected_members)
                 )
             
             # Mantener el mismo estado para continuar la selección
@@ -400,8 +415,11 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             else:
                 members = context.user_data["family_members"]
             
-            # Seleccionar todos los miembros
-            selected_members = [str(member.get("id")) for member in members if member.get("id")]
+            # Filtrar para excluir al creador
+            filtered_members = [member for member in members if str(member.get("id")) != str(current_member_id)]
+            
+            # Seleccionar todos los miembros (excepto el creador, que ya está incluido automáticamente)
+            selected_members = [str(member.get("id")) for member in filtered_members if member.get("id")]
             
             # Actualizar la selección en el contexto
             expense_data["selected_members"] = selected_members
@@ -410,7 +428,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             # Mostrar el teclado actualizado
             await update.message.reply_text(
                 "Se han seleccionado todos los miembros. Presiona \"✓ Continuar\" cuando estés listo.",
-                reply_markup=Keyboards.get_select_members_keyboard(members, selected_members)
+                reply_markup=Keyboards.get_select_members_keyboard(filtered_members, selected_members)
             )
             
             # Mantener el mismo estado para continuar la selección
@@ -434,14 +452,17 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             else:
                 members = context.user_data["family_members"]
             
+            # Filtrar para excluir al creador
+            filtered_members = [member for member in members if str(member.get("id")) != str(current_member_id)]
+            
             # Deseleccionar todos los miembros
             expense_data["selected_members"] = []
             context.user_data["expense_data"] = expense_data
             
             # Mostrar el teclado actualizado
             await update.message.reply_text(
-                "Se han deseleccionado todos los miembros. Por favor, selecciona al menos un miembro antes de continuar.",
-                reply_markup=Keyboards.get_select_members_keyboard(members, [])
+                "Se han deseleccionado todos los miembros. El gasto será solo para ti a menos que selecciones a otros miembros.",
+                reply_markup=Keyboards.get_select_members_keyboard(filtered_members, [])
             )
             
             # Mantener el mismo estado para continuar la selección
@@ -449,20 +470,16 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             
         # Si el usuario selecciona "Continuar"
         elif selection == "✓ Continuar":
-            # Verificar si hay miembros seleccionados
+            # Obtener la lista actual de miembros seleccionados
             selected_members = expense_data.get("selected_members", [])
             
-            if not selected_members:
-                # Si no hay miembros seleccionados, mostrar error
-                await update.message.reply_text(
-                    "Debes seleccionar al menos un miembro para dividir el gasto. Por favor, selecciona miembros.",
-                    reply_markup=Keyboards.get_select_members_keyboard(context.user_data["family_members"], [])
-                )
-                # Mantener el mismo estado para continuar la selección
-                return SELECT_MEMBERS
+            # Incluir al creador del gasto siempre en la lista de split_among
+            final_split_among = selected_members.copy()
+            if str(current_member_id) not in final_split_among:
+                final_split_among.append(str(current_member_id))
             
             # Guardar la lista final de miembros seleccionados para el API
-            expense_data["split_among"] = selected_members
+            expense_data["split_among"] = final_split_among
             context.user_data["expense_data"] = expense_data
             
             # Mostrar confirmación
