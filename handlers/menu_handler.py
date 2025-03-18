@@ -445,7 +445,7 @@ async def handle_unknown_text(update: Update, context: ContextTypes.DEFAULT_TYPE
     telegram_id = str(update.effective_user.id)
     
     # Mostrar mensaje informativo y el menú principal
-    unknown_command_text = get_message(telegram_id, "UNKNOWN_COMMAND", "No entiendo ese comando. Aquí tienes el menú principal:")
+    unknown_command_text = get_message(telegram_id, "UNKNOWN_COMMAND")
     
     await update.message.reply_text(
         unknown_command_text,
