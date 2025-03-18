@@ -436,13 +436,8 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Mostrar opciones de edición y eliminación
         return await show_edit_options(update, context)
     else:
-        # Opción no reconocida, mostrar mensaje de error
-        invalid_option_text = get_message(telegram_id, "ERROR_INVALID_OPTION", "Opción no válida. Por favor, selecciona una opción del menú:")
-        await update.message.reply_text(
-            invalid_option_text,
-            reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
-        )
-        return ConversationHandler.END
+        # Si la opción no coincide con ninguna del menú, llamar a handle_unknown_text
+        return await handle_unknown_text(update, context)
 
 async def handle_unknown_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """

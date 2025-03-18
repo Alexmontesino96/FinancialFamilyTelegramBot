@@ -262,18 +262,15 @@ def main():
     for handler in get_language_handlers():
         application.add_handler(handler)
     
-    # 2. Manejador para opciones específicas del menú principal
+    # 2. Manejador para opciones específicas del menú principal (acepta cualquier texto)
     application.add_handler(MessageHandler(
-        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación|🌍 Cambiar Idioma)$"),
+        filters.TEXT & ~filters.COMMAND, 
         handle_menu_option
     ))
     
-    # 3. Manejador para texto desconocido (debe ser el último)
-    application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND, 
-        handle_unknown_text
-    ))
-    
+    # 3. Manejador para texto desconocido (debe ser el último) - Ya no es necesario porque handle_menu_option
+    # ahora maneja cualquier texto desconocido internamente
+
     # Iniciar el bot
     logger.info("Bot is ready to handle updates")
     application.run_polling()
