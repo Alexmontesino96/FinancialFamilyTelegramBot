@@ -358,6 +358,9 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Obtener la opción seleccionada por el usuario
     option = update.message.text
     
+    # Obtener ID del usuario para traducciones
+    telegram_id = str(update.effective_user.id)
+    
     # Imprimir la opción para depuración
     print(f"Opción seleccionada: {option}")
     
@@ -367,7 +370,6 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         print(f"Ya tenemos el family_id en el contexto: {family_id}")
     else:
         # Si no tenemos el ID de familia, verificar que el usuario esté en una familia
-        telegram_id = str(update.effective_user.id)
         print(f"Solicitando información del miembro con telegram_id: {telegram_id}")
         
         # Obtener información del miembro desde la API
@@ -389,41 +391,56 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Cargar los nombres de los miembros en el contexto para uso futuro
         await ContextManager.load_family_members(context, family_id)
     
+    # Importar Keyboards localmente para evitar dependencias circulares
+    from ui.keyboards import Keyboards
+    
+    # Obtener textos traducidos para cada opción del menú
+    create_expense_text = Keyboards.get_text(telegram_id, "CREATE_EXPENSE")
+    list_expenses_text = Keyboards.get_text(telegram_id, "LIST_EXPENSES")
+    register_payment_text = Keyboards.get_text(telegram_id, "REGISTER_PAYMENT")
+    list_payments_text = Keyboards.get_text(telegram_id, "LIST_PAYMENTS")
+    list_records_text = Keyboards.get_text(telegram_id, "LIST_RECORDS")
+    view_balances_text = Keyboards.get_text(telegram_id, "VIEW_BALANCES")
+    family_info_text = Keyboards.get_text(telegram_id, "FAMILY_INFO")
+    share_invitation_text = Keyboards.get_text(telegram_id, "SHARE_INVITATION")
+    edit_delete_text = Keyboards.get_text(telegram_id, "EDIT_DELETE")
+    
     # Procesar la opción seleccionada y redirigir al manejador correspondiente
-    if option == "💸 Crear Gasto":
+    if option == create_expense_text:
         # Iniciar el flujo de creación de gastos
         return await crear_gasto(update, context)
-    elif option == "📋 Ver Gastos":
+    elif option == list_expenses_text:
         # OBSOLETO: Ahora se usa Listar Registros > Listar Gastos
         # Mantenemos por compatibilidad
         return await listar_gastos(update, context)
-    elif option == "💳 Registrar Pago":
+    elif option == register_payment_text:
         # Iniciar el flujo de registro de pagos
         return await registrar_pago(update, context)
-    elif option == "📊 Ver Pagos":
+    elif option == list_payments_text:
         # OBSOLETO: Ahora se usa Listar Registros > Listar Pagos
         # Mantenemos por compatibilidad
         return await listar_pagos(update, context)
-    elif option == "📜 Listar Registros":
+    elif option == list_records_text:
         # Mostrar el submenú de listar registros
         return await show_list_options(update, context)
-    elif option == "💰 Ver Balances":
+    elif option == view_balances_text:
         # Mostrar los balances entre miembros de la familia
         return await show_balances(update, context)
-    elif option == "ℹ️ Info Familia":
+    elif option == family_info_text:
         # Mostrar información de la familia
         return await mostrar_info_familia(update, context)
-    elif option == "🔗 Compartir Invitación":
+    elif option == share_invitation_text:
         # Generar y compartir un código de invitación
         return await compartir_invitacion(update, context)
-    elif option == "✏️ Editar/Eliminar":
+    elif option == edit_delete_text:
         # Mostrar opciones de edición y eliminación
         return await show_edit_options(update, context)
     else:
         # Opción no reconocida, mostrar mensaje de error
+        invalid_option_text = get_message(telegram_id, "ERROR_INVALID_OPTION", "Opción no válida. Por favor, selecciona una opción del menú:")
         await update.message.reply_text(
-            "Opción no válida. Por favor, selecciona una opción del menú:",
-            reply_markup=Keyboards.get_main_menu_keyboard()
+            invalid_option_text,
+            reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
         )
         return ConversationHandler.END
 
