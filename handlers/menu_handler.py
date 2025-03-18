@@ -17,7 +17,6 @@ from services.family_service import FamilyService
 from services.member_service import MemberService
 from utils.context_manager import ContextManager
 from utils.helpers import send_error
-from languages.utils.language_handler import language_command
 
 # Importaciones de otros manejadores para las diferentes opciones del menú
 from handlers.expense_handler import crear_gasto, listar_gastos
@@ -51,11 +50,24 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 family_id = member.get("family_id")
                 context.user_data["family_id"] = family_id
         
-        # Primero limpiar el teclado para forzar la actualización
-        await update.message.reply_text(
-            "Preparando menú...",
-            reply_markup=Keyboards.remove_keyboard()
-        )
+        # Determinar si estamos tratando con un mensaje normal o un callback_query
+        is_callback = update.callback_query is not None
+        
+        # Si es un callback query, obtenemos el chat_id del mensaje del callback
+        if is_callback:
+            chat_id = update.callback_query.message.chat_id
+            # Enviar un nuevo mensaje en lugar de editar
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="Preparando menú...",
+                reply_markup=Keyboards.remove_keyboard()
+            )
+        else:
+            # Caso normal, es un mensaje directo
+            await update.message.reply_text(
+                "Preparando menú...",
+                reply_markup=Keyboards.remove_keyboard()
+            )
         
         # Cargar miembros si no están en el contexto
         if not context.user_data.get("member_names"):
@@ -114,9 +126,15 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         else:
                             # Formato no reconocido
                             print(f"Formato de balances no reconocido: {balances}")
-                            await update.message.reply_text(
-                                "❌ Error: Formato de balances no reconocido. Contacte al administrador."
-                            )
+                            if is_callback:
+                                await context.bot.send_message(
+                                    chat_id=chat_id,
+                                    text="❌ Error: Formato de balances no reconocido. Contacte al administrador."
+                                )
+                            else:
+                                await update.message.reply_text(
+                                    "❌ Error: Formato de balances no reconocido. Contacte al administrador."
+                                )
                             return ConversationHandler.END
                     
                     # Crear resumen de balances para mostrar en la parte inferior
@@ -154,11 +172,19 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             bottom_balance += "💰 *Nadie te debe dinero*\n"
         
         # Mostrar el mensaje del menú principal con el teclado de opciones y resumen de balance
-        await update.message.reply_text(
-            message_menu + bottom_balance,
-            reply_markup=Keyboards.get_main_menu_keyboard(),
-            parse_mode="Markdown"
-        )
+        if is_callback:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=message_menu + bottom_balance,
+                reply_markup=Keyboards.get_main_menu_keyboard(),
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                message_menu + bottom_balance,
+                reply_markup=Keyboards.get_main_menu_keyboard(),
+                parse_mode="Markdown"
+            )
         
         # Finalizar la conversación actual para permitir nuevas interacciones
         return ConversationHandler.END
@@ -169,10 +195,28 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         traceback.print_exc()
         
         # En caso de error, mostrar solo el menú básico
-        await update.message.reply_text(
-            Messages.MAIN_MENU,
-            reply_markup=Keyboards.get_main_menu_keyboard()
-        )
+        try:
+            if update.callback_query:
+                await context.bot.send_message(
+                    chat_id=update.callback_query.message.chat_id,
+                    text=Messages.MAIN_MENU,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+            else:
+                await update.message.reply_text(
+                    Messages.MAIN_MENU,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+        except Exception as e2:
+            print(f"Error secundario en show_main_menu: {str(e2)}")
+            # Intento final - enviar mensaje sin contexto
+            telegram_id = str(update.effective_user.id)
+            await context.bot.send_message(
+                chat_id=telegram_id,
+                text=Messages.MAIN_MENU,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            
         return ConversationHandler.END
 
 async def show_list_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -327,9 +371,6 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
     elif option == "✏️ Editar/Eliminar":
         # Mostrar opciones de edición y eliminación
         return await show_edit_options(update, context)
-    elif option == "🌍 Cambiar Idioma":
-        # Mostrar opciones para cambiar el idioma
-        return await language_command(update, context)
     else:
         # Opción no reconocida, mostrar mensaje de error
         await update.message.reply_text(

@@ -6,7 +6,8 @@ de idioma en Telegram.
 """
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, CallbackQueryHandler
+from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from ui.keyboards import Keyboards
 
 from languages.utils.translator import SUPPORTED_LANGUAGES, set_language, get_message
 
@@ -28,7 +29,7 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     keyboard = []
     row = []
     for code, name in SUPPORTED_LANGUAGES.items():
-        # Añadir 3 botones por fila
+        # Añadir 2 botones por fila
         if len(row) < 2:
             row.append(InlineKeyboardButton(name, callback_data=f"lang_{code}"))
         else:
@@ -49,10 +50,17 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     user_id = str(update.effective_user.id)
     
     # Enviar mensaje de selección de idioma
-    await update.message.reply_text(
-        get_message(user_id, "LANGUAGE_SELECTION"),
-        reply_markup=reply_markup
-    )
+    if update.message:
+        await update.message.reply_text(
+            get_message(user_id, "LANGUAGE_SELECTION"),
+            reply_markup=reply_markup
+        )
+    else:
+        # En caso de callback query
+        await update.callback_query.edit_message_text(
+            get_message(user_id, "LANGUAGE_SELECTION"),
+            reply_markup=reply_markup
+        )
     
     return SELECTING_LANGUAGE
 
@@ -73,6 +81,9 @@ async def language_selection_handler(update: Update, context: ContextTypes.DEFAU
     callback_data = query.data
     user_id = str(update.effective_user.id)
     
+    # Para depuración
+    print(f"Recibido callback_data: {callback_data}")
+    
     # Cancelar operación
     if callback_data == "lang_cancel":
         await query.edit_message_text(get_message(user_id, "CANCEL_OPERATION"))
@@ -81,18 +92,42 @@ async def language_selection_handler(update: Update, context: ContextTypes.DEFAU
     # Extraer código de idioma
     lang_code = callback_data.split("_")[1]
     
+    # Para depuración
+    print(f"Cambiando idioma a: {lang_code}")
+    
     # Establecer idioma
     if set_language(user_id, lang_code):
         # Obtener el nombre del idioma para la confirmación
         language_name = SUPPORTED_LANGUAGES[lang_code]
         
+        # Para depuración
+        print(f"Idioma establecido correctamente a: {language_name}")
+        
         # Enviar mensaje de confirmación en el nuevo idioma
-        await query.edit_message_text(get_message(user_id, "LANGUAGE_UPDATED"))
+        try:
+            await query.edit_message_text(get_message(user_id, "LANGUAGE_UPDATED"))
+            print("Mensaje de confirmación enviado correctamente")
+        except Exception as e:
+            print(f"Error al enviar confirmación: {str(e)}")
+            await query.edit_message_text(f"✅ Idioma actualizado a {language_name}")
     else:
         # Si ocurrió un error al establecer el idioma
+        print("Error al establecer el idioma")
         await query.edit_message_text(
             "❌ Error al cambiar el idioma. Por favor, inténtalo de nuevo más tarde."
         )
+    
+    # Enviar directamente un nuevo mensaje con el menú principal
+    chat_id = update.callback_query.message.chat_id
+    try:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=get_message(user_id, "MAIN_MENU"),
+            reply_markup=Keyboards.get_main_menu_keyboard(),
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        print(f"Error al enviar menú principal: {str(e)}")
     
     return ConversationHandler.END
 
@@ -103,14 +138,22 @@ def get_language_handlers():
     Returns:
         Lista de manejadores para registrar en el bot.
     """
+    # Handler independiente para el callback
+    callback_handler = CallbackQueryHandler(language_selection_handler, pattern=r"^lang_")
+    
+    # Conversation handler para el flujo completo
     language_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("language", language_command)],
+        entry_points=[
+            CommandHandler("language", language_command),
+            MessageHandler(filters.Regex("^🌍 Cambiar Idioma$"), language_command)
+        ],
         states={
             SELECTING_LANGUAGE: [
-                CallbackQueryHandler(language_selection_handler, pattern=r"^lang_")
+                callback_handler
             ],
         },
-        fallbacks=[]
+        fallbacks=[],
+        name="language_conversation"
     )
     
-    return [language_conv_handler] 
+    return [language_conv_handler, callback_handler] 
