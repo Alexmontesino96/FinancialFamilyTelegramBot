@@ -7,6 +7,7 @@ It handles expense creation, retrieval, updating, and deletion.
 
 from services.api_service import ApiService
 import traceback
+import requests
 
 class ExpenseService:
     """
@@ -17,43 +18,64 @@ class ExpenseService:
     """
     
     @staticmethod
-    def create_expense(description, amount, paid_by, family_id, telegram_id=None):
+    def create_expense(description, amount, paid_by, family_id, telegram_id=None, split_among=None):
         """
-        Creates a new expense.
+        Crea un nuevo gasto.
         
         Args:
-            description (str): Description of the expense
-            amount (float): Amount of the expense
-            paid_by (str): ID of the member who paid
-            family_id (str): ID of the family
-            telegram_id (str, optional): Telegram ID of the user creating the expense
+            description (str): Descripción del gasto
+            amount (float): Monto del gasto
+            paid_by (str): ID del miembro que pagó el gasto
+            family_id (str): ID de la familia del gasto
+            telegram_id (str, opcional): ID de Telegram para validación
+            split_among (list, opcional): Lista de IDs de miembros entre los que dividir el gasto
             
         Returns:
-            tuple: (status_code, response)
+            tuple: (status_code, response_json)
         """
         try:
-            print(f"Creando gasto: description={description}, amount={amount}, paid_by={paid_by}, family_id={family_id}, telegram_id={telegram_id}")
-            data = {
+            # Construir la URL para la solicitud
+            url = f"{API_BASE_URL}/expenses/"
+            
+            # Preparar los datos para la solicitud
+            expense_data = {
                 "description": description,
                 "amount": amount,
                 "paid_by": paid_by
             }
-            # Usar el endpoint correcto de la API
-            endpoint = "/expenses"
-            status_code, response = ApiService.request("POST", endpoint, data, token=telegram_id, params={"telegram_id": telegram_id}, check_status=False)
-            print(f"Resultado de create_expense: status_code={status_code}, response={response}")
             
-            # Verificar si la respuesta es válida
-            if status_code in [200, 201] and response:
-                print(f"Gasto creado exitosamente: {response}")
-                return status_code, response
-            else:
-                print(f"Error al crear gasto: status_code={status_code}, response={response}")
-                return status_code, response
+            # Añadir split_among solo si está especificado
+            if split_among is not None:
+                expense_data["split_among"] = split_among
+            
+            # Parámetros para la solicitud
+            params = {}
+            if telegram_id:
+                params["telegram_id"] = telegram_id
+                
+            print(f"[API] Creando gasto con datos: {expense_data} y params: {params}")
+            
+            # Realizar la solicitud POST a la API
+            response = requests.post(
+                url,
+                json=expense_data,
+                params=params
+            )
+            
+            # Parsear y devolver la respuesta
+            status_code = response.status_code
+            
+            try:
+                response_json = response.json()
+            except ValueError:
+                # Si no es JSON válido, usar el texto como respuesta
+                response_json = {"detail": response.text}
+                
+            return status_code, response_json
+            
         except Exception as e:
-            print(f"Excepción en create_expense: {str(e)}")
-            traceback.print_exc()
-            return 500, {"error": f"Error al crear gasto: {str(e)}"}
+            print(f"Error en create_expense: {str(e)}")
+            return 500, {"detail": str(e)}
     
     @staticmethod
     def get_family_expenses(family_id, telegram_id=None):

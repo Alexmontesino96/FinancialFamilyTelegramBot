@@ -26,7 +26,7 @@ if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN environment variable is required")
 
 # API configuration
-API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8099')
+API_BASE_URL = os.getenv('API_BASE_URL_RENDER')
 
 # Conversation states for different flows
 # Start flow - Family creation and joining
@@ -38,6 +38,7 @@ JOIN_FAMILY_CODE = 3 # State for asking the family code when joining
 # Expense flow - Creating and managing expenses
 DESCRIPTION = 4      # State for asking expense description
 AMOUNT = 5           # State for asking expense amount
+SELECT_MEMBERS = 16   # State for selecting members to split the expense with
 CONFIRM = 6          # State for confirming expense creation
 
 # Payment flow - Registering payments between members

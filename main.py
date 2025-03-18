@@ -23,6 +23,7 @@ from config import (
     JOIN_FAMILY_CODE,
     DESCRIPTION,
     AMOUNT,
+    SELECT_MEMBERS,
     CONFIRM,
     SELECT_TO_MEMBER,
     PAYMENT_AMOUNT,
@@ -54,6 +55,8 @@ from handlers.menu_handler import (
 from handlers.expense_handler import (
     get_expense_description,
     get_expense_amount,
+    show_expense_division_options,
+    select_members_for_expense,
     show_expense_confirmation,
     confirm_expense,
     crear_gasto,
@@ -204,6 +207,7 @@ def main():
         states={
             DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_description)],
             AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_amount)],
+            SELECT_MEMBERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_members_for_expense)],
             CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_expense)]
         },
         fallbacks=[

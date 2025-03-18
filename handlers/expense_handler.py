@@ -7,7 +7,7 @@ creating new expenses, listing existing expenses, and managing expense data.
 
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
-from config import DESCRIPTION, AMOUNT, CONFIRM, logger
+from config import DESCRIPTION, AMOUNT, SELECT_MEMBERS, CONFIRM, logger
 from ui.keyboards import Keyboards
 from ui.messages import Messages
 from ui.formatters import Formatters
@@ -159,7 +159,7 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
     Handles the expense amount input from the user.
     
     This function validates and saves the amount provided by the user,
-    then shows a confirmation message with the expense details.
+    then shows options for how to divide the expense.
     
     Args:
         update (Update): Telegram Update object
@@ -210,14 +210,276 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Guardar el monto validado en el contexto del usuario
         context.user_data["expense_data"]["amount"] = amount
         
-        # Mostrar la confirmación del gasto
-        return await show_expense_confirmation(update, context)
+        # Mostrar opciones de división del gasto
+        return await show_expense_division_options(update, context)
         
     except Exception as e:
         # Manejo de errores inesperados
         print(f"Error en get_expense_amount: {str(e)}")
         traceback.print_exc()
         await send_error(update, context, "Ocurrió un error al procesar el monto del gasto.")
+        return ConversationHandler.END
+
+async def show_expense_division_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Shows options for how to divide the expense among family members.
+    
+    Args:
+        update (Update): Telegram Update object
+        context (ContextTypes.DEFAULT_TYPE): Telegram context
+        
+    Returns:
+        int: The next conversation state
+    """
+    try:
+        # Obtener datos del gasto del contexto
+        expense_data = context.user_data.get("expense_data", {})
+        amount = expense_data.get("amount", 0)
+        
+        # Mostrar mensaje con opciones de división
+        await update.message.reply_text(
+            Messages.CREATE_EXPENSE_DIVISION.format(amount=amount),
+            parse_mode="Markdown",
+            reply_markup=Keyboards.get_expense_division_keyboard()
+        )
+        
+        # Pasar al siguiente estado: seleccionar miembros
+        return SELECT_MEMBERS
+        
+    except Exception as e:
+        print(f"Error en show_expense_division_options: {str(e)}")
+        traceback.print_exc()
+        await send_error(update, context, "Ocurrió un error al mostrar las opciones de división del gasto.")
+        return ConversationHandler.END
+
+async def select_members_for_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handles the selection of members to share an expense with.
+    
+    Args:
+        update (Update): Telegram Update object
+        context (ContextTypes.DEFAULT_TYPE): Telegram context
+        
+    Returns:
+        int: The next conversation state
+    """
+    try:
+        # Obtener la opción seleccionada por el usuario
+        selection = update.message.text.strip()
+        
+        # Verificar si el usuario quiere cancelar la operación
+        if selection == "❌ Cancelar":
+            await update.message.reply_text(
+                Messages.CANCEL_OPERATION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            # Limpiar datos temporales
+            if "expense_data" in context.user_data:
+                del context.user_data["expense_data"]
+            return await _show_menu(update, context)
+        
+        # Obtener datos del gasto y de la familia
+        expense_data = context.user_data.get("expense_data", {})
+        family_id = expense_data.get("family_id")
+        telegram_id = expense_data.get("telegram_id")
+        current_member_id = expense_data.get("member_id")
+        
+        # Si el usuario elige dividir entre todos (opción por defecto)
+        if selection == "👥 Dividir entre todos (por defecto)":
+            # No es necesario especificar split_among, se usará a todos los miembros por defecto
+            expense_data["split_among"] = None
+            context.user_data["expense_data"] = expense_data
+            
+            # Mostrar confirmación directamente
+            return await show_expense_confirmation(update, context)
+        
+        # Si el usuario elige seleccionar miembros específicos
+        elif selection == "👤 Seleccionar miembros específicos":
+            # Obtener la lista de miembros de la familia
+            members_status, members = FamilyService.get_family_members(family_id, token=telegram_id)
+            
+            if members_status != 200 or not members:
+                await update.message.reply_text(
+                    "No se pudo obtener la lista de miembros de la familia. Por favor, intenta nuevamente.",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+            
+            # Guardar la lista de miembros en el contexto para uso futuro
+            context.user_data["family_members"] = members
+            
+            # Actualizar la caché de nombres con todos los miembros
+            if "member_names" not in context.user_data:
+                context.user_data["member_names"] = {}
+            
+            for member in members:
+                member_id = member.get("id")
+                member_name = member.get("name", f"Usuario {member_id}")
+                if member_id:
+                    context.user_data["member_names"][str(member_id)] = member_name
+            
+            # Preseleccionar al usuario actual
+            preselected_ids = [str(current_member_id)] if current_member_id else []
+            expense_data["selected_members"] = preselected_ids
+            context.user_data["expense_data"] = expense_data
+            
+            # Mostrar el teclado de selección de miembros
+            await update.message.reply_text(
+                Messages.CREATE_EXPENSE_SELECT_MEMBERS,
+                reply_markup=Keyboards.get_select_members_keyboard(members, preselected_ids)
+            )
+            
+            # Mantener el mismo estado para permitir la selección de miembros
+            return SELECT_MEMBERS
+            
+        # Si el usuario está en el proceso de selección de miembros
+        elif selection.startswith("✅ ") or selection.startswith("⬜ "):
+            # Verificar si tenemos la lista de miembros en el contexto
+            if "family_members" not in context.user_data:
+                # Si no tenemos la lista, obtenerla nuevamente
+                members_status, members = FamilyService.get_family_members(family_id, token=telegram_id)
+                
+                if members_status != 200 or not members:
+                    await update.message.reply_text(
+                        "No se pudo obtener la lista de miembros de la familia. Por favor, intenta nuevamente.",
+                        reply_markup=Keyboards.get_main_menu_keyboard()
+                    )
+                    return ConversationHandler.END
+                
+                context.user_data["family_members"] = members
+            else:
+                members = context.user_data["family_members"]
+            
+            # Obtener la lista actual de miembros seleccionados
+            selected_members = expense_data.get("selected_members", [])
+            
+            # Encontrar el miembro correspondiente a la selección
+            member_name = selection[2:].strip()  # Quitar el prefijo (✅ o ⬜)
+            selected_member_id = None
+            
+            for member in members:
+                if member.get("name") == member_name:
+                    selected_member_id = str(member.get("id"))
+                    break
+            
+            if selected_member_id:
+                # Alternar la selección del miembro
+                if selected_member_id in selected_members:
+                    selected_members.remove(selected_member_id)
+                else:
+                    selected_members.append(selected_member_id)
+                
+                # Actualizar la selección en el contexto
+                expense_data["selected_members"] = selected_members
+                context.user_data["expense_data"] = expense_data
+                
+                # Mostrar el teclado actualizado
+                await update.message.reply_text(
+                    "Selección actualizada. Continúa seleccionando miembros o presiona \"✓ Continuar\" cuando termines.",
+                    reply_markup=Keyboards.get_select_members_keyboard(members, selected_members)
+                )
+            
+            # Mantener el mismo estado para continuar la selección
+            return SELECT_MEMBERS
+            
+        # Si el usuario selecciona "Seleccionar todos"
+        elif selection == "✅ Seleccionar todos":
+            # Verificar si tenemos la lista de miembros en el contexto
+            if "family_members" not in context.user_data:
+                # Si no tenemos la lista, obtenerla nuevamente
+                members_status, members = FamilyService.get_family_members(family_id, token=telegram_id)
+                
+                if members_status != 200 or not members:
+                    await update.message.reply_text(
+                        "No se pudo obtener la lista de miembros de la familia. Por favor, intenta nuevamente.",
+                        reply_markup=Keyboards.get_main_menu_keyboard()
+                    )
+                    return ConversationHandler.END
+                
+                context.user_data["family_members"] = members
+            else:
+                members = context.user_data["family_members"]
+            
+            # Seleccionar todos los miembros
+            selected_members = [str(member.get("id")) for member in members if member.get("id")]
+            
+            # Actualizar la selección en el contexto
+            expense_data["selected_members"] = selected_members
+            context.user_data["expense_data"] = expense_data
+            
+            # Mostrar el teclado actualizado
+            await update.message.reply_text(
+                "Se han seleccionado todos los miembros. Presiona \"✓ Continuar\" cuando estés listo.",
+                reply_markup=Keyboards.get_select_members_keyboard(members, selected_members)
+            )
+            
+            # Mantener el mismo estado para continuar la selección
+            return SELECT_MEMBERS
+            
+        # Si el usuario selecciona "Deseleccionar todos"
+        elif selection == "⬜ Deseleccionar todos":
+            # Verificar si tenemos la lista de miembros en el contexto
+            if "family_members" not in context.user_data:
+                # Si no tenemos la lista, obtenerla nuevamente
+                members_status, members = FamilyService.get_family_members(family_id, token=telegram_id)
+                
+                if members_status != 200 or not members:
+                    await update.message.reply_text(
+                        "No se pudo obtener la lista de miembros de la familia. Por favor, intenta nuevamente.",
+                        reply_markup=Keyboards.get_main_menu_keyboard()
+                    )
+                    return ConversationHandler.END
+                
+                context.user_data["family_members"] = members
+            else:
+                members = context.user_data["family_members"]
+            
+            # Deseleccionar todos los miembros
+            expense_data["selected_members"] = []
+            context.user_data["expense_data"] = expense_data
+            
+            # Mostrar el teclado actualizado
+            await update.message.reply_text(
+                "Se han deseleccionado todos los miembros. Por favor, selecciona al menos un miembro antes de continuar.",
+                reply_markup=Keyboards.get_select_members_keyboard(members, [])
+            )
+            
+            # Mantener el mismo estado para continuar la selección
+            return SELECT_MEMBERS
+            
+        # Si el usuario selecciona "Continuar"
+        elif selection == "✓ Continuar":
+            # Verificar si hay miembros seleccionados
+            selected_members = expense_data.get("selected_members", [])
+            
+            if not selected_members:
+                # Si no hay miembros seleccionados, mostrar error
+                await update.message.reply_text(
+                    "Debes seleccionar al menos un miembro para dividir el gasto. Por favor, selecciona miembros.",
+                    reply_markup=Keyboards.get_select_members_keyboard(context.user_data["family_members"], [])
+                )
+                # Mantener el mismo estado para continuar la selección
+                return SELECT_MEMBERS
+            
+            # Guardar la lista final de miembros seleccionados para el API
+            expense_data["split_among"] = selected_members
+            context.user_data["expense_data"] = expense_data
+            
+            # Mostrar confirmación
+            return await show_expense_confirmation(update, context)
+            
+        # Si la respuesta no es reconocida, pedir que seleccione una opción válida
+        else:
+            await update.message.reply_text(
+                "Por favor, selecciona una opción válida.",
+                reply_markup=Keyboards.get_expense_division_keyboard()
+            )
+            return SELECT_MEMBERS
+            
+    except Exception as e:
+        print(f"Error en select_members_for_expense: {str(e)}")
+        traceback.print_exc()
+        await send_error(update, context, "Ocurrió un error al seleccionar los miembros para el gasto.")
         return ConversationHandler.END
 
 async def show_expense_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -234,237 +496,63 @@ async def show_expense_confirmation(update: Update, context: ContextTypes.DEFAUL
     Returns:
         int: The next conversation state
     """
-    # Obtener los datos del gasto del contexto del usuario
-    expense_data = context.user_data.get("expense_data", {})
-    description = expense_data.get("description", "")
-    amount = expense_data.get("amount", 0)
-    
-    # Mostrar mensaje de confirmación con los detalles del gasto
-    await update.message.reply_text(
-        Messages.CREATE_EXPENSE_CONFIRM.format(
-            description=description,
-            amount=amount,
-            paid_by="Tú"
-        ),
-        parse_mode="Markdown",
-        reply_markup=Keyboards.get_confirmation_keyboard()
-    )
-    # Pasar al siguiente estado: confirmar gasto
-    return CONFIRM
-
-async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Handles the user's confirmation of a new expense.
-    
-    This function processes the user's confirmation or cancellation of 
-    an expense creation operation. If confirmed, it creates a new expense
-    in the database.
-    
-    Args:
-        update (Update): Telegram Update object
-        context (ContextTypes.DEFAULT_TYPE): Telegram context
-        
-    Returns:
-        int: The next conversation state
-    """
     try:
-        # Obtener la respuesta del usuario (confirmar o cancelar)
-        response = update.message.text.strip()
-        
-        # Obtener los datos del gasto del contexto
+        # Obtener los datos del gasto del contexto del usuario
         expense_data = context.user_data.get("expense_data", {})
+        description = expense_data.get("description", "")
+        amount = expense_data.get("amount", 0)
         
-        # Procesar según la respuesta
-        if response == "✅ Confirmar":
-            # Si el usuario confirma, crear el gasto
-            description = expense_data.get("description")
-            amount = expense_data.get("amount")
+        # Determinar cómo se dividirá el gasto
+        split_among = expense_data.get("split_among")
+        
+        # Preparar el texto para mostrar cómo se divide el gasto
+        if split_among is None:
+            split_text = "Todos los miembros de la familia"
+        else:
+            # Obtener los nombres de los miembros seleccionados
+            member_names = []
             
-            # Obtener el ID del miembro que paga - puede estar en member_id (clave inicial)
-            member_id = expense_data.get("member_id")
-            paid_by = expense_data.get("paid_by", member_id)  # Usar member_id como fallback
+            for member_id in split_among:
+                # Primero intentar obtener el nombre de la caché
+                if "member_names" in context.user_data and member_id in context.user_data["member_names"]:
+                    name = context.user_data["member_names"][member_id]
+                    member_names.append(name)
+                # Luego intentar buscar en la lista de miembros de la familia
+                elif "family_members" in context.user_data:
+                    for member in context.user_data["family_members"]:
+                        if str(member.get("id")) == str(member_id):
+                            name = member.get("name", f"Usuario {member_id}")
+                            member_names.append(name)
+                            break
+                else:
+                    # Si no se encuentra el nombre, usar el ID
+                    member_names.append(f"Usuario {member_id}")
             
-            # Asegurar que tengamos un paid_by válido
-            if not paid_by and member_id:
-                paid_by = member_id
-            
-            family_id = expense_data.get("family_id")
-            telegram_id = expense_data.get("telegram_id")
-            
-            # Verificar que tenemos todos los datos necesarios
-            if not all([description, amount, paid_by, family_id]):
-                await update.message.reply_text(
-                    "Faltan datos para crear el gasto. Por favor, inténtalo de nuevo.",
-                    reply_markup=Keyboards.get_main_menu_keyboard()
-                )
-                return ConversationHandler.END
-            
-            # Crear el gasto a través del servicio
-            status_code, response = ExpenseService.create_expense(
+            # Crear el texto con los nombres
+            if member_names:
+                split_text = ", ".join(member_names)
+            else:
+                split_text = "Error: no se encontraron miembros seleccionados"
+        
+        # Mostrar mensaje de confirmación con los detalles del gasto
+        await update.message.reply_text(
+            Messages.CREATE_EXPENSE_CONFIRM.format(
                 description=description,
                 amount=amount,
-                paid_by=paid_by,
-                family_id=family_id,
-                telegram_id=telegram_id
-            )
-            
-            # Procesar según el resultado
-            if status_code in [200, 201]:
-                # Si se creó correctamente, mostrar mensaje de éxito
-                await update.message.reply_text(
-                    Messages.SUCCESS_EXPENSE_CREATED,
-                    reply_markup=Keyboards.get_main_menu_keyboard()
-                )
-                
-                # Notificar a todos los miembros de la familia sobre el nuevo gasto
-                try:
-                    # Obtener la información completa del gasto creado
-                    expense_id = response.get("id")
-                    created_at = response.get("created_at", "desconocida")
-                    
-                    # Formatear la fecha si está disponible
-                    if isinstance(created_at, str) and "T" in created_at:
-                        date_part = created_at.split("T")[0]
-                        created_at = date_part
-                    
-                    # Obtener el nombre del miembro que pagó - Simplificar usando el contexto
-                    paid_by_name = "Desconocido"
-                    
-                    # Si el pagador es el usuario actual, usar el nombre guardado en expense_data
-                    if str(paid_by) == str(expense_data.get("member_id")):
-                        paid_by_name = expense_data.get("member_name", update.effective_user.first_name)
-                        logger.info(f"[NOTIFY_EXPENSE] Usando nombre del creador del gasto: {paid_by_name}")
-                    # Si no es el usuario actual, intentar obtenerlo de la caché de nombres
-                    elif "member_names" in context.user_data and str(paid_by) in context.user_data["member_names"]:
-                        paid_by_name = context.user_data["member_names"][str(paid_by)]
-                        logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en caché: {paid_by_name}")
-                    # Solo si no está en caché, buscar en la familia
-                    else:
-                        logger.info(f"[NOTIFY_EXPENSE] Buscando nombre en la familia para ID: {paid_by}")
-                        # Intentar obtener de la familia en caché
-                        if "family" in context.user_data and "members" in context.user_data["family"]:
-                            for member in context.user_data["family"]["members"]:
-                                if str(member.get("id")) == str(paid_by):
-                                    paid_by_name = member.get("name", "Desconocido")
-                                    logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en familia: {paid_by_name}")
-                                    
-                                    # Actualizar caché
-                                    if "member_names" not in context.user_data:
-                                        context.user_data["member_names"] = {}
-                                    context.user_data["member_names"][str(paid_by)] = paid_by_name
-                                    break
-                    
-                    # Obtener la lista de miembros de la familia
-                    logger.info(f"[NOTIFY_EXPENSE] Obteniendo miembros de la familia {family_id} para notificar sobre nuevo gasto")
-                    members_status, members = FamilyService.get_family_members(family_id, token=telegram_id)
-                    
-                    if members_status == 200 and members:
-                        # Actualizar caché de nombres y guardar la familia para uso futuro
-                        if paid_by_name == "Desconocido":
-                            for member in members:
-                                if str(member.get("id")) == str(paid_by):
-                                    paid_by_name = member.get("name", "Desconocido")
-                                    logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en miembros obtenidos: {paid_by_name}")
-                                    break
-                        
-                        # Actualizar la caché de nombres con todos los miembros
-                        if "member_names" not in context.user_data:
-                            context.user_data["member_names"] = {}
-                        
-                        for member in members:
-                            member_id = member.get("id")
-                            member_name = member.get("name", f"Usuario {member_id}")
-                            if member_id:
-                                context.user_data["member_names"][str(member_id)] = member_name
-                        
-                        # Guardar la familia en el contexto para uso futuro
-                        context.user_data["family"] = {"members": members}
-                        
-                        # Formatear el mensaje de notificación
-                        notification_message = (
-                            f"💸 *Nuevo Gasto Registrado*\n\n"
-                            f"*Descripción:* {description}\n"
-                            f"*Monto:* ${amount:.2f}\n"
-                            f"*Pagado por:* {paid_by_name}\n"
-                            f"*Fecha:* {created_at}\n\n"
-                            f"_Gasto registrado en la familia por {update.effective_user.first_name}_"
-                        )
-                        
-                        # Enviar mensaje a cada miembro de la familia
-                        current_user_id = str(update.effective_user.id)
-                        notified_count = 0
-                        
-                        for member in members:
-                            member_telegram_id = member.get("telegram_id")
-                            
-                            # No enviar notificación al usuario que creó el gasto (ya recibió confirmación)
-                            if member_telegram_id and member_telegram_id != current_user_id:
-                                try:
-                                    await context.bot.send_message(
-                                        chat_id=member_telegram_id,
-                                        text=notification_message,
-                                        parse_mode="Markdown"
-                                    )
-                                    notified_count += 1
-                                    logger.info(f"[NOTIFY_EXPENSE] Notificación enviada a miembro {member.get('name')} (ID: {member_telegram_id})")
-                                except Exception as notify_error:
-                                    logger.error(f"[NOTIFY_EXPENSE] Error al notificar a miembro {member_telegram_id}: {str(notify_error)}")
-                        
-                        if notified_count > 0:
-                            logger.info(f"[NOTIFY_EXPENSE] Se notificó a {notified_count} miembros sobre el nuevo gasto")
-                    else:
-                        logger.warning(f"[NOTIFY_EXPENSE] No se pudo obtener la lista de miembros. Status: {members_status}")
-                
-                except Exception as notify_error:
-                    logger.error(f"[NOTIFY_EXPENSE] Error en proceso de notificación: {str(notify_error)}")
-                    traceback.print_exc()
-                    # No bloqueamos el flujo principal si la notificación falla
-                
-                # Limpiar los datos del gasto del contexto
-                if "expense_data" in context.user_data:
-                    del context.user_data["expense_data"]
-                
-                # Finalizar conversación
-                return ConversationHandler.END
-            else:
-                # Si hubo un error, mostrar el mensaje de error
-                error_message = "Error desconocido"
-                if isinstance(response, dict) and "detail" in response:
-                    error_message = response["detail"]
-                
-                await update.message.reply_text(
-                    f"❌ Error al crear el gasto: {error_message}",
-                    reply_markup=Keyboards.get_main_menu_keyboard()
-                )
-                return ConversationHandler.END
+                paid_by="Tú",
+                split_among=split_text
+            ),
+            parse_mode="Markdown",
+            reply_markup=Keyboards.get_confirmation_keyboard()
+        )
         
-        elif response == "❌ Cancelar":
-            # Si el usuario cancela, mostrar mensaje de cancelación
-            await update.message.reply_text(
-                Messages.CANCEL_OPERATION,
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
-            
-            # Limpiar los datos del gasto del contexto
-            if "expense_data" in context.user_data:
-                del context.user_data["expense_data"]
-            
-            # Finalizar conversación
-            return ConversationHandler.END
-        
-        else:
-            # Si la respuesta no es reconocida, pedir que seleccione una opción válida
-            await update.message.reply_text(
-                "Por favor, selecciona 'Confirmar' o 'Cancelar'.",
-                reply_markup=Keyboards.get_confirmation_keyboard()
-            )
-            return CONFIRM
+        # Pasar al siguiente estado: confirmar gasto
+        return CONFIRM
         
     except Exception as e:
-        # Manejo de errores inesperados
-        print(f"Error en confirm_expense: {str(e)}")
+        print(f"Error en show_expense_confirmation: {str(e)}")
         traceback.print_exc()
-        await send_error(update, context, f"Error al confirmar el gasto: {str(e)}")
+        await send_error(update, context, "Ocurrió un error al mostrar la confirmación del gasto.")
         return ConversationHandler.END
 
 async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -626,4 +714,265 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Error en listar_gastos: {str(e)}")
         traceback.print_exc()
         await send_error(update, context, "Ocurrió un error al listar los gastos.")
-        return await _show_menu(update, context) 
+        return await _show_menu(update, context)
+
+async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handles the user's confirmation of a new expense.
+    
+    This function processes the user's confirmation or cancellation of 
+    an expense creation operation. If confirmed, it creates a new expense
+    in the database.
+    
+    Args:
+        update (Update): Telegram Update object
+        context (ContextTypes.DEFAULT_TYPE): Telegram context
+        
+    Returns:
+        int: The next conversation state
+    """
+    try:
+        # Obtener la respuesta del usuario (confirmar o cancelar)
+        response = update.message.text.strip()
+        
+        # Obtener los datos del gasto del contexto
+        expense_data = context.user_data.get("expense_data", {})
+        
+        # Procesar según la respuesta
+        if response == "✅ Confirmar":
+            # Si el usuario confirma, crear el gasto
+            description = expense_data.get("description")
+            amount = expense_data.get("amount")
+            
+            # Obtener el ID del miembro que paga - puede estar en member_id (clave inicial)
+            member_id = expense_data.get("member_id")
+            paid_by = expense_data.get("paid_by", member_id)  # Usar member_id como fallback
+            
+            # Asegurar que tengamos un paid_by válido
+            if not paid_by and member_id:
+                paid_by = member_id
+            
+            family_id = expense_data.get("family_id")
+            telegram_id = expense_data.get("telegram_id")
+            split_among = expense_data.get("split_among") # Lista de IDs o None (todos)
+            
+            # Verificar que tenemos todos los datos necesarios
+            if not all([description, amount, paid_by, family_id]):
+                await update.message.reply_text(
+                    "Faltan datos para crear el gasto. Por favor, inténtalo de nuevo.",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+            
+            # Crear el gasto a través del servicio
+            status_code, response = ExpenseService.create_expense(
+                description=description,
+                amount=amount,
+                paid_by=paid_by,
+                family_id=family_id,
+                telegram_id=telegram_id,
+                split_among=split_among
+            )
+            
+            # Procesar según el resultado
+            if status_code in [200, 201]:
+                # Si se creó correctamente, mostrar mensaje de éxito
+                await update.message.reply_text(
+                    Messages.SUCCESS_EXPENSE_CREATED,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                
+                # Notificar a todos los miembros de la familia sobre el nuevo gasto
+                try:
+                    # Obtener la información completa del gasto creado
+                    expense_id = response.get("id")
+                    created_at = response.get("created_at", "desconocida")
+                    
+                    # Formatear la fecha si está disponible
+                    if isinstance(created_at, str) and "T" in created_at:
+                        date_part = created_at.split("T")[0]
+                        created_at = date_part
+                    
+                    # Obtener el nombre del miembro que pagó - Simplificar usando el contexto
+                    paid_by_name = "Desconocido"
+                    
+                    # Si el pagador es el usuario actual, usar el nombre guardado en expense_data
+                    if str(paid_by) == str(expense_data.get("member_id")):
+                        paid_by_name = expense_data.get("member_name", update.effective_user.first_name)
+                        logger.info(f"[NOTIFY_EXPENSE] Usando nombre del creador del gasto: {paid_by_name}")
+                    # Si no es el usuario actual, intentar obtenerlo de la caché de nombres
+                    elif "member_names" in context.user_data and str(paid_by) in context.user_data["member_names"]:
+                        paid_by_name = context.user_data["member_names"][str(paid_by)]
+                        logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en caché: {paid_by_name}")
+                    # Solo si no está en caché, buscar en la familia
+                    else:
+                        logger.info(f"[NOTIFY_EXPENSE] Buscando nombre en la familia para ID: {paid_by}")
+                        # Intentar obtener de la familia en caché
+                        if "family" in context.user_data and "members" in context.user_data["family"]:
+                            for member in context.user_data["family"]["members"]:
+                                if str(member.get("id")) == str(paid_by):
+                                    paid_by_name = member.get("name", "Desconocido")
+                                    logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en familia: {paid_by_name}")
+                                    
+                                    # Actualizar caché
+                                    if "member_names" not in context.user_data:
+                                        context.user_data["member_names"] = {}
+                                    context.user_data["member_names"][str(paid_by)] = paid_by_name
+                                    break
+                    
+                    # Determinar los miembros que deben recibir la notificación
+                    # Si split_among es None, notificar a todos los miembros de la familia
+                    # Si no, notificar solo a los miembros incluidos en split_among
+                    members_to_notify = []
+                    
+                    # Obtener la lista de miembros de la familia
+                    logger.info(f"[NOTIFY_EXPENSE] Obteniendo miembros de la familia {family_id} para notificar sobre nuevo gasto")
+                    members_status, members = FamilyService.get_family_members(family_id, token=telegram_id)
+                    
+                    if members_status == 200 and members:
+                        # Actualizar caché de nombres y guardar la familia para uso futuro
+                        if paid_by_name == "Desconocido":
+                            for member in members:
+                                if str(member.get("id")) == str(paid_by):
+                                    paid_by_name = member.get("name", "Desconocido")
+                                    logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en miembros obtenidos: {paid_by_name}")
+                                    break
+                        
+                        # Actualizar la caché de nombres con todos los miembros
+                        if "member_names" not in context.user_data:
+                            context.user_data["member_names"] = {}
+                        
+                        for member in members:
+                            member_id = member.get("id")
+                            member_name = member.get("name", f"Usuario {member_id}")
+                            if member_id:
+                                context.user_data["member_names"][str(member_id)] = member_name
+                        
+                        # Guardar la familia en el contexto para uso futuro
+                        context.user_data["family"] = {"members": members}
+                        
+                        # Filtrar los miembros que deberían recibir la notificación
+                        if split_among is None:
+                            # Si se divide entre todos, notificar a todos
+                            members_to_notify = members
+                        else:
+                            # Si se divide entre miembros específicos, filtrar la lista
+                            for member in members:
+                                member_id = str(member.get("id"))
+                                if member_id in split_among:
+                                    members_to_notify.append(member)
+                        
+                        # Crear texto que indique cómo se dividió el gasto
+                        split_text = ""
+                        if split_among is None:
+                            split_text = "*Dividido entre:* Todos los miembros\n"
+                        else:
+                            # Crear lista de nombres
+                            member_names_list = []
+                            for member_id in split_among:
+                                name = None
+                                # Buscar en la caché de nombres
+                                if member_id in context.user_data["member_names"]:
+                                    name = context.user_data["member_names"][member_id]
+                                
+                                # Si no se encuentra en la caché, buscar en los miembros
+                                if not name:
+                                    for member in members:
+                                        if str(member.get("id")) == member_id:
+                                            name = member.get("name", f"Usuario {member_id}")
+                                            break
+                                
+                                if name:
+                                    member_names_list.append(name)
+                                else:
+                                    member_names_list.append(f"Usuario {member_id}")
+                            
+                            split_text = f"*Dividido entre:* {', '.join(member_names_list)}\n"
+                        
+                        # Formatear el mensaje de notificación
+                        notification_message = (
+                            f"💸 *Nuevo Gasto Registrado*\n\n"
+                            f"*Descripción:* {description}\n"
+                            f"*Monto:* ${amount:.2f}\n"
+                            f"*Pagado por:* {paid_by_name}\n"
+                            f"{split_text}"
+                            f"*Fecha:* {created_at}\n\n"
+                            f"_Gasto registrado en la familia por {update.effective_user.first_name}_"
+                        )
+                        
+                        # Enviar mensaje a cada miembro seleccionado
+                        current_user_id = str(update.effective_user.id)
+                        notified_count = 0
+                        
+                        for member in members_to_notify:
+                            member_telegram_id = member.get("telegram_id")
+                            
+                            # No enviar notificación al usuario que creó el gasto (ya recibió confirmación)
+                            if member_telegram_id and member_telegram_id != current_user_id:
+                                try:
+                                    await context.bot.send_message(
+                                        chat_id=member_telegram_id,
+                                        text=notification_message,
+                                        parse_mode="Markdown"
+                                    )
+                                    notified_count += 1
+                                    logger.info(f"[NOTIFY_EXPENSE] Notificación enviada a miembro {member.get('name')} (ID: {member_telegram_id})")
+                                except Exception as notify_error:
+                                    logger.error(f"[NOTIFY_EXPENSE] Error al notificar a miembro {member_telegram_id}: {str(notify_error)}")
+                        
+                        if notified_count > 0:
+                            logger.info(f"[NOTIFY_EXPENSE] Se notificó a {notified_count} miembros sobre el nuevo gasto")
+                    else:
+                        logger.warning(f"[NOTIFY_EXPENSE] No se pudo obtener la lista de miembros. Status: {members_status}")
+                
+                except Exception as notify_error:
+                    logger.error(f"[NOTIFY_EXPENSE] Error en proceso de notificación: {str(notify_error)}")
+                    traceback.print_exc()
+                    # No bloqueamos el flujo principal si la notificación falla
+                
+                # Limpiar los datos del gasto del contexto
+                if "expense_data" in context.user_data:
+                    del context.user_data["expense_data"]
+                
+                # Finalizar conversación
+                return ConversationHandler.END
+            else:
+                # Si hubo un error, mostrar el mensaje de error
+                error_message = "Error desconocido"
+                if isinstance(response, dict) and "detail" in response:
+                    error_message = response["detail"]
+                
+                await update.message.reply_text(
+                    f"❌ Error al crear el gasto: {error_message}",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+        
+        elif response == "❌ Cancelar":
+            # Si el usuario cancela, mostrar mensaje de cancelación
+            await update.message.reply_text(
+                Messages.CANCEL_OPERATION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
+            
+            # Limpiar los datos del gasto del contexto
+            if "expense_data" in context.user_data:
+                del context.user_data["expense_data"]
+            
+            # Finalizar conversación
+            return ConversationHandler.END
+        
+        else:
+            # Si la respuesta no es reconocida, pedir que seleccione una opción válida
+            await update.message.reply_text(
+                "Por favor, selecciona 'Confirmar' o 'Cancelar'.",
+                reply_markup=Keyboards.get_confirmation_keyboard()
+            )
+            return CONFIRM
+        
+    except Exception as e:
+        # Manejo de errores inesperados
+        print(f"Error en confirm_expense: {str(e)}")
+        traceback.print_exc()
+        await send_error(update, context, f"Error al confirmar el gasto: {str(e)}")
+        return ConversationHandler.END 

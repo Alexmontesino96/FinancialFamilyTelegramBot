@@ -58,10 +58,20 @@ class Messages:
     CREATE_EXPENSE_AMOUNT = "👍 Descripción recibida: *{description}*\n\n" \
                            "Ahora, ¿cuál es el monto del gasto? (Ej: 100.50)"
     
+    CREATE_EXPENSE_DIVISION = "👍 Monto recibido: *${amount:.2f}*\n\n" \
+                             "¿Cómo quieres dividir este gasto?"
+    
+    CREATE_EXPENSE_SELECT_MEMBERS = "👥 Selecciona los miembros que compartirán este gasto:\n\n" \
+                                   "Toca sobre un nombre para seleccionar/deseleccionar\n" \
+                                   "- Los nombres con ✅ están seleccionados\n" \
+                                   "- Los nombres con ⬜ no están seleccionados\n\n" \
+                                   "Cuando termines, presiona \"✓ Continuar\""
+    
     CREATE_EXPENSE_CONFIRM = "📝 Resumen del gasto:\n\n" \
                             "*Descripción:* {description}\n" \
                             "*Monto:* ${amount:.2f}\n" \
-                            "*Pagado por:* {paid_by}\n\n" \
+                            "*Pagado por:* {paid_by}\n" \
+                            "*Dividido entre:* {split_among}\n\n" \
                             "¿Confirmas este gasto?"
     
     # Mensajes para listar gastos
