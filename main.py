@@ -203,21 +203,29 @@ def main():
     
     expense_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^💸 Crear Gasto$"), crear_gasto)
+            MessageHandler(filters.Regex("^💸 Create Expense$|^💸 Crear Gasto$"), crear_gasto)
         ],
         states={
             DESCRIPTION: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_description)
             ],
-            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_amount)],
-            SELECT_MEMBERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_members_for_expense)],
-            CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_expense)]
+            AMOUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_amount)
+            ],
+            SELECT_MEMBERS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, select_members_for_expense)
+            ],
+            CONFIRM: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_expense)
+            ]
         },
         fallbacks=[
-            CommandHandler("cancel", cancel)
+            CommandHandler("cancel", cancel),
+            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), cancel)
         ],
         name="expense_conversation",
-        persistent=False
+        persistent=False,
+        allow_reentry=True
     )
     logger.info("Conversation handlers configurados correctamente")
     
@@ -268,7 +276,14 @@ def main():
             message_text = update.message.text
             user_id = update.effective_user.id if update.effective_user else 'Unknown'
             conversation_key = context.chat_data.get('_conversation_key', 'None')
-            logger.info(f"[MESSAGE_DEBUG] User: {user_id}, Text: '{message_text}', Conversation: {conversation_key}")
+            # Obtener el estado de la conversación desde chat_data
+            current_state = "No state found"
+            for handler_name in ["expense_conversation", "payment_conversation", "edit_conversation", "list_conversation", "family_conversation", "language_conversation"]:
+                if f"{handler_name}_state" in context.chat_data:
+                    current_state = f"{handler_name}: {context.chat_data[f'{handler_name}_state']}"
+                    break
+            
+            logger.info(f"[MESSAGE_DEBUG] User: {user_id}, Text: '{message_text}', Conversation: {conversation_key}, State: {current_state}")
         return None
     
     application.add_handler(MessageHandler(filters.ALL, log_message), group=-1)  # group=-1 para que se ejecute primero

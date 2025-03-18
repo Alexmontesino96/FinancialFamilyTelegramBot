@@ -150,15 +150,19 @@ def get_language_handlers():
     language_conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("language", language_command),
-            MessageHandler(filters.Regex(f"^{Keyboards.DEFAULT_TEXTS['CHANGE_LANGUAGE']}$"), language_command)
+            MessageHandler(filters.Regex(r"^🌍 Change Language$|^🌍 Cambiar Idioma$"), language_command)
         ],
         states={
             SELECTING_LANGUAGE: [
                 callback_handler
             ],
         },
-        fallbacks=[],
-        name="language_conversation"
+        fallbacks=[
+            CommandHandler("cancel", lambda update, context: ConversationHandler.END),
+        ],
+        name="language_conversation",
+        persistent=False,
+        allow_reentry=True
     )
     
-    return [language_conv_handler, callback_handler] 
+    return [language_conv_handler] 
