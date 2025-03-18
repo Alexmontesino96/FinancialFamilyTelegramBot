@@ -326,24 +326,11 @@ def main():
         application.add_handler(handler, group=1)
     
     # 2. Manejador para opciones específicas del menú principal - Grupo 2 (menor prioridad)
-    # Añadir una función auxiliar para verificar si un mensaje NO debe ser procesado
-    # porque ya fue manejado por otros handlers
-    def not_already_handled(update):
-        """Verifica si el mensaje no ha sido ya manejado por otro handler."""
-        # Si no hay mensaje, no procesamos
-        if not hasattr(update, 'message') or not update.message or not hasattr(update.message, 'text'):
-            return False
-            
-        # Acceder al contexto del usuario
-        context = update._effective_user_context
-        if context and context.user_data.get("balances_shown"):
-            logger.info(f"[FILTER] Mensaje ya procesado por otro handler (balances_shown): {update.message.text}")
-            return False
-            
-        return True
+    # Eliminamos el filtro personalizado complejo que estaba causando problemas
+    # y usamos una solución alternativa basada en verificación dentro del handler
     
     application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & ~filters.UpdateType.EDITED_MESSAGE & filters.create(not_already_handled), 
+        filters.TEXT & ~filters.COMMAND & ~filters.UpdateType.EDITED_MESSAGE, 
         handle_menu_option
     ), group=2)
     

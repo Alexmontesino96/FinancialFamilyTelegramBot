@@ -51,17 +51,26 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
         int: The next conversation state
     """
     try:
+        # Obtener el ID de Telegram del usuario para logs
+        telegram_id = str(update.effective_user.id)
+        print(f"[BALANCES] Iniciando show_balances para usuario {telegram_id}")
+        
         # Verificar si ya hemos mostrado balances en los últimos segundos
         # para evitar procesamiento duplicado
         last_balance_time = context.user_data.get("last_balance_time", 0)
         current_time = time.time()
         
-        if current_time - last_balance_time < 2:  # 2 segundos de protección
-            print(f"Evitando mostrar balances duplicados. Último balance mostrado hace {current_time - last_balance_time} segundos")
+        if current_time - last_balance_time < 3:  # 3 segundos de protección
+            print(f"[BALANCES] Evitando mostrar balances duplicados. Último balance mostrado hace {current_time - last_balance_time} segundos para {telegram_id}")
             return ConversationHandler.END
             
         # Actualizar timestamp de último balance mostrado
         context.user_data["last_balance_time"] = current_time
+        print(f"[BALANCES] Marca de tiempo actualizada para {telegram_id}")
+        
+        # Establecer la bandera de balances mostrados
+        context.user_data["balances_shown"] = True
+        print(f"[BALANCES] Bandera balances_shown activada para {telegram_id}")
         
         # Obtener el ID de la familia del contexto o del usuario
         family_id = ContextManager.get_family_id(context)

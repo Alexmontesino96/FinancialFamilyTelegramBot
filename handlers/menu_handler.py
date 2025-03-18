@@ -355,6 +355,13 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
     Returns:
         int: The next conversation state
     """
+    # Verificar si acabamos de mostrar los balances para evitar procesamiento duplicado
+    if context.user_data.get("balances_shown"):
+        # Limpiar la bandera para futuras interacciones
+        del context.user_data["balances_shown"]
+        print(f"Evitando procesamiento duplicado en handle_menu_option debido a balances mostrados recientemente")
+        return ConversationHandler.END
+    
     # Obtener la opción seleccionada por el usuario
     option = update.message.text
     
@@ -482,13 +489,6 @@ async def handle_unknown_text(update: Update, context: ContextTypes.DEFAULT_TYPE
     Returns:
         int: The next conversation state
     """
-    # Verificar si acabamos de mostrar los balances
-    if context.user_data.get("balances_shown"):
-        # Limpiar la bandera para futuras interacciones
-        del context.user_data["balances_shown"]
-        print("Evitando procesamiento adicional después de mostrar balances")
-        return ConversationHandler.END
-        
     # Obtener ID del usuario para traducciones
     telegram_id = str(update.effective_user.id)
     
