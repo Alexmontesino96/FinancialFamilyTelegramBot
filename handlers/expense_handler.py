@@ -183,15 +183,22 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Obtener el texto del monto ingresado por el usuario
         amount_text = update.message.text.strip()
         
+        # Obtener telegram_id para traducciones
+        telegram_id = str(update.effective_user.id)
+        
+        # Mensajes de depuración para el log
+        logger.info(f"[DEBUG] get_expense_amount: Recibido texto: '{amount_text}'")
+        
         # Verificar si el usuario quiere cancelar la operación
-        if amount_text == "❌ Cancelar":
+        if amount_text == "❌ Cancelar" or amount_text == "❌ Cancel":
             await update.message.reply_text(
-                Messages.CANCEL_OPERATION,
-                reply_markup=Keyboards.get_main_menu_keyboard()
+                get_message(telegram_id, "CANCEL_OPERATION"),
+                reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
             )
             # Limpiar datos temporales
             if "expense_data" in context.user_data:
                 del context.user_data["expense_data"]
+            logger.info("[DEBUG] Operación de creación de gasto cancelada por el usuario")
             return await _show_menu(update, context)
         
         # Intentar convertir el texto a un número flotante
@@ -199,11 +206,13 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Reemplazar comas por puntos para manejar diferentes formatos numéricos
             amount_text = amount_text.replace(',', '.')
             amount = float(amount_text)
+            logger.info(f"[DEBUG] Monto convertido a número: {amount}")
             
             # Verificar que el monto sea positivo
             if amount <= 0:
+                logger.info("[DEBUG] Monto no válido: debe ser positivo")
                 await update.message.reply_text(
-                    "El monto debe ser un número positivo. Por favor, ingresa el monto nuevamente:",
+                    get_message(telegram_id, "ERROR_INVALID_AMOUNT"),
                     reply_markup=Keyboards.get_cancel_keyboard()
                 )
                 # Permanecer en el mismo estado para pedir nuevamente el monto
@@ -211,8 +220,9 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 
         except ValueError:
             # Si no se puede convertir a número, mostrar error
+            logger.info(f"[DEBUG] Error de conversión: '{amount_text}' no es un número válido")
             await update.message.reply_text(
-                "El valor ingresado no es un número válido. Por favor, ingresa solo números:",
+                get_message(telegram_id, "ERROR_INVALID_AMOUNT"),
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
             # Permanecer en el mismo estado para pedir nuevamente el monto
@@ -220,13 +230,14 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
         # Guardar el monto validado en el contexto del usuario
         context.user_data["expense_data"]["amount"] = amount
+        logger.info(f"[DEBUG] Monto guardado en contexto: {amount}")
         
         # Mostrar opciones de división del gasto
         return await show_expense_division_options(update, context)
         
     except Exception as e:
         # Manejo de errores inesperados
-        print(f"Error en get_expense_amount: {str(e)}")
+        logger.error(f"Error en get_expense_amount: {str(e)}")
         traceback.print_exc()
         await send_error(update, context, "Ocurrió un error al procesar el monto del gasto.")
         return ConversationHandler.END
@@ -246,19 +257,23 @@ async def show_expense_division_options(update: Update, context: ContextTypes.DE
         # Obtener datos del gasto del contexto
         expense_data = context.user_data.get("expense_data", {})
         amount = expense_data.get("amount", 0)
+        telegram_id = expense_data.get("telegram_id")
+        
+        logger.info(f"[DEBUG] show_expense_division_options: Mostrando opciones de división para monto {amount}")
         
         # Mostrar mensaje con opciones de división
         await update.message.reply_text(
-            Messages.CREATE_EXPENSE_DIVISION.format(amount=amount),
+            get_message(telegram_id, "CREATE_EXPENSE_DIVISION").format(amount=amount),
             parse_mode="Markdown",
             reply_markup=Keyboards.get_expense_division_keyboard()
         )
         
         # Pasar al siguiente estado: seleccionar miembros
+        logger.info(f"[DEBUG] Pasando al estado SELECT_MEMBERS={SELECT_MEMBERS}")
         return SELECT_MEMBERS
         
     except Exception as e:
-        print(f"Error en show_expense_division_options: {str(e)}")
+        logger.error(f"Error en show_expense_division_options: {str(e)}")
         traceback.print_exc()
         await send_error(update, context, "Ocurrió un error al mostrar las opciones de división del gasto.")
         return ConversationHandler.END

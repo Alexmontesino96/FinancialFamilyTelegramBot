@@ -161,44 +161,52 @@ def main():
         states={
             ASK_FAMILY_CODE: [
                 # Para depuración, registremos el mensaje exacto
-                MessageHandler(filters.TEXT & ~filters.COMMAND, 
+                MessageHandler(filters.TEXT, 
                                lambda update, context: 
                                    logger.info(f"[DEBUG] Mensaje exacto recibido: '{update.message.text}'") or start_create_family(update, context)),
             ],
             ASK_FAMILY_NAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_user_name)
+                MessageHandler(filters.TEXT, ask_user_name)
             ],
             ASK_USER_NAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, create_family_with_names)
+                MessageHandler(filters.TEXT, create_family_with_names)
             ],
             JOIN_FAMILY_CODE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, join_family)
+                MessageHandler(filters.TEXT, join_family)
             ]
         },
         fallbacks=[
-            CommandHandler("cancel", cancel)
+            CommandHandler("cancel", cancel),
+            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), cancel)
         ],
         name="family_conversation",
-        persistent=False
+        persistent=False,
+        allow_reentry=True,
+        per_chat=True,
+        per_user=True
     )
     
     # Manejadores para otros flujos
     edit_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^✏️ Editar/Eliminar$"), show_edit_options)
+            MessageHandler(filters.Regex("^✏️ Editar/Eliminar$|^✏️ Edit/Delete$"), show_edit_options)
         ],
         states={
-            EDIT_OPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_option)],
-            SELECT_EXPENSE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_select_expense)],
-            SELECT_PAYMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_select_payment)],
-            CONFIRM_DELETE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_confirm_delete)],
-            EDIT_EXPENSE_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_expense_amount)]
+            EDIT_OPTION: [MessageHandler(filters.TEXT, handle_edit_option)],
+            SELECT_EXPENSE: [MessageHandler(filters.TEXT, handle_select_expense)],
+            SELECT_PAYMENT: [MessageHandler(filters.TEXT, handle_select_payment)],
+            CONFIRM_DELETE: [MessageHandler(filters.TEXT, handle_confirm_delete)],
+            EDIT_EXPENSE_AMOUNT: [MessageHandler(filters.TEXT, handle_edit_expense_amount)]
         },
         fallbacks=[
-            CommandHandler("cancel", edit_cancel)
+            CommandHandler("cancel", edit_cancel),
+            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), edit_cancel)
         ],
         name="edit_conversation",
-        persistent=False
+        persistent=False,
+        allow_reentry=True,
+        per_chat=True,
+        per_user=True
     )
     
     expense_conv_handler = ConversationHandler(
@@ -207,16 +215,16 @@ def main():
         ],
         states={
             DESCRIPTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_description)
+                MessageHandler(filters.TEXT, get_expense_description)
             ],
             AMOUNT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_amount)
+                MessageHandler(filters.TEXT, get_expense_amount)
             ],
             SELECT_MEMBERS: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, select_members_for_expense)
+                MessageHandler(filters.TEXT, select_members_for_expense)
             ],
             CONFIRM: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_expense)
+                MessageHandler(filters.TEXT, confirm_expense)
             ]
         },
         fallbacks=[
@@ -225,38 +233,48 @@ def main():
         ],
         name="expense_conversation",
         persistent=False,
-        allow_reentry=True
+        allow_reentry=True,
+        per_chat=True,
+        per_user=True
     )
     logger.info("Conversation handlers configurados correctamente")
     
     payment_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^💳 Registrar Pago$"), registrar_pago)
+            MessageHandler(filters.Regex("^💳 Registrar Pago$|^💳 Register Payment$"), registrar_pago)
         ],
         states={
-            SELECT_TO_MEMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_to_member)],
-            PAYMENT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_payment_amount)],
-            PAYMENT_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_payment)]
+            SELECT_TO_MEMBER: [MessageHandler(filters.TEXT, select_to_member)],
+            PAYMENT_AMOUNT: [MessageHandler(filters.TEXT, get_payment_amount)],
+            PAYMENT_CONFIRM: [MessageHandler(filters.TEXT, confirm_payment)]
         },
         fallbacks=[
-            CommandHandler("cancel", cancel)
+            CommandHandler("cancel", cancel),
+            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), cancel)
         ],
         name="payment_conversation",
-        persistent=False
+        persistent=False,
+        allow_reentry=True,
+        per_chat=True,
+        per_user=True
     )
     
     list_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^📜 Listar Registros$"), show_list_options)
+            MessageHandler(filters.Regex("^📜 Listar Registros$|^📜 List Records$"), show_list_options)
         ],
         states={
-            LIST_OPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_list_option)]
+            LIST_OPTION: [MessageHandler(filters.TEXT, handle_list_option)]
         },
         fallbacks=[
-            CommandHandler("cancel", cancel)
+            CommandHandler("cancel", cancel),
+            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), cancel)
         ],
         name="list_conversation",
-        persistent=False
+        persistent=False,
+        allow_reentry=True,
+        per_chat=True,
+        per_user=True
     )
     
     # Añadir todos los handlers en el orden correcto
