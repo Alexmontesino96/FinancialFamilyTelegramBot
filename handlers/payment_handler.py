@@ -652,13 +652,26 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             from_member_name = from_member_data.get("name", "")
                     
                     # Obtener información del destinatario para enviar la notificación
+                    print(f"Obteniendo datos del miembro receptor con ID: {to_member_id}")
                     status_code, to_member_data = MemberService.get_member_by_id(to_member_id)
+                    print(f"Respuesta de get_member_by_id: status_code={status_code}, data={to_member_data}")
                     
                     if status_code == 200 and to_member_data:
                         to_telegram_id = to_member_data.get("telegram_id")
                         to_member_name = to_member_data.get("name", "")
                         
-                        if to_telegram_id and to_telegram_id != telegram_id:  # No notificar si es el mismo usuario
+                        print(f"ID de Telegram del receptor: '{to_telegram_id}', Nombre: '{to_member_name}'")
+                        
+                        # Verificar que el ID de Telegram es válido
+                        if not to_telegram_id:
+                            print("Error: El receptor no tiene un ID de Telegram válido")
+                            await update.message.reply_text(
+                                f"✅ Pago registrado correctamente, pero no se pudo notificar a {to_member_name} porque no tiene un ID de Telegram válido.",
+                                parse_mode="Markdown"
+                            )
+                        elif to_telegram_id == telegram_id:
+                            print("El remitente y el receptor son el mismo usuario, omitiendo notificación")
+                        else:
                             # Formatear fecha si está disponible
                             import datetime
                             current_date = datetime.datetime.now().strftime("%d/%m/%Y")
@@ -677,20 +690,65 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             
                             # Enviar notificación al receptor del pago
                             try:
+                                print(f"Intentando enviar notificación a {to_member_name} (ID: {to_telegram_id})")
+                                
+                                # Intentar convertir el ID a entero si es posible (Telegram espera IDs numéricos)
+                                try:
+                                    numeric_telegram_id = int(to_telegram_id)
+                                    print(f"ID convertido a formato numérico: {numeric_telegram_id}")
+                                    to_telegram_id = numeric_telegram_id
+                                except (ValueError, TypeError):
+                                    print(f"No se pudo convertir el ID a formato numérico, usando el valor original: {to_telegram_id}")
+                                
+                                # Enviar el mensaje
                                 await context.bot.send_message(
                                     chat_id=to_telegram_id,
                                     text=notification_message,
                                     parse_mode="Markdown"
                                 )
-                                print(f"Notificación enviada a {to_member_name} (ID: {to_telegram_id})")
+                                print(f"✅ Notificación enviada exitosamente a {to_member_name} (ID: {to_telegram_id})")
+                                
+                                # Informar al pagador que la notificación se envió
+                                await update.message.reply_text(
+                                    f"✅ {to_member_name} ha sido notificado sobre tu pago.",
+                                    parse_mode="Markdown"
+                                )
                             except Exception as e:
-                                print(f"Error al enviar notificación: {str(e)}")
+                                error_msg = str(e)
+                                print(f"❌ Error al enviar notificación: {error_msg}")
+                                
+                                # Informar al pagador sobre el problema
+                                if "bot was blocked by the user" in error_msg:
+                                    await update.message.reply_text(
+                                        f"⚠️ No se pudo notificar a {to_member_name} porque ha bloqueado el bot.",
+                                        parse_mode="Markdown"
+                                    )
+                                elif "chat not found" in error_msg:
+                                    await update.message.reply_text(
+                                        f"⚠️ No se pudo notificar a {to_member_name} porque aún no ha iniciado una conversación con el bot. " 
+                                        f"Pídele que inicie el bot enviando /start.",
+                                        parse_mode="Markdown"
+                                    )
+                                else:
+                                    await update.message.reply_text(
+                                        f"⚠️ No se pudo notificar a {to_member_name} sobre el pago. Error: {error_msg}",
+                                        parse_mode="Markdown"
+                                    )
                     else:
-                        print(f"No se pudo obtener información del receptor: {status_code}")
+                        print(f"❌ No se pudo obtener información del receptor: {status_code}")
+                        await update.message.reply_text(
+                            "⚠️ El pago fue registrado, pero no se pudo notificar al receptor porque no se encontró su información.",
+                            parse_mode="Markdown"
+                        )
                 
                 except Exception as e:
-                    print(f"Error al enviar notificación de pago: {str(e)}")
-                    # No interrumpir el flujo principal si falla la notificación
+                    print(f"❌ Error general al enviar notificación de pago: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    await update.message.reply_text(
+                        "⚠️ El pago fue registrado correctamente, pero ocurrió un error al notificar al receptor.",
+                        parse_mode="Markdown"
+                    )
                 
                 # Limpiar los datos del pago del contexto
                 if "payment_data" in context.user_data:
