@@ -10,7 +10,7 @@ class Keyboards:
             ["💰 Ver Balances", "💸 Crear Gasto"],
             ["📜 Listar Registros", "💳 Registrar Pago"],
             ["✏️ Editar/Eliminar", "ℹ️ Info Familia"],
-            ["🔗 Compartir Invitación"]
+            ["🔗 Compartir Invitación", "🌍 Cambiar Idioma"]
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     

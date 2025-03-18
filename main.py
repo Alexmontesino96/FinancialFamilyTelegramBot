@@ -87,6 +87,7 @@ from handlers.edit_handler import (
 )
 from utils.error_handler import register_error_handlers
 from health_check import start_health_check_server
+from languages import get_language_handlers
 
 # Importar la función para verificar instancias duplicadas
 # Primero intentamos importar el verificador específico para Render
@@ -257,9 +258,13 @@ def main():
     application.add_handler(payment_conv_handler)
     application.add_handler(list_conv_handler)
     
+    # Añadir los manejadores del sistema de idiomas
+    for handler in get_language_handlers():
+        application.add_handler(handler)
+    
     # 2. Manejador para opciones específicas del menú principal
     application.add_handler(MessageHandler(
-        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación)$"),
+        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación|🌍 Cambiar Idioma)$"),
         handle_menu_option
     ))
     

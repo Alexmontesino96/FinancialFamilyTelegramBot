@@ -17,6 +17,7 @@ from services.family_service import FamilyService
 from services.member_service import MemberService
 from utils.context_manager import ContextManager
 from utils.helpers import send_error
+from languages.utils.language_handler import language_command
 
 # Importaciones de otros manejadores para las diferentes opciones del menú
 from handlers.expense_handler import crear_gasto, listar_gastos
@@ -326,6 +327,9 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
     elif option == "✏️ Editar/Eliminar":
         # Mostrar opciones de edición y eliminación
         return await show_edit_options(update, context)
+    elif option == "🌍 Cambiar Idioma":
+        # Mostrar opciones para cambiar el idioma
+        return await language_command(update, context)
     else:
         # Opción no reconocida, mostrar mensaje de error
         await update.message.reply_text(
