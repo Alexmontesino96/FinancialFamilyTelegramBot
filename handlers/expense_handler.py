@@ -68,8 +68,18 @@ async def crear_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["expense_data"] = {
             "telegram_id": telegram_id,
             "member_id": member.get("id"),
-            "family_id": member.get("family_id")
+            "family_id": member.get("family_id"),
+            "member_name": member.get("name", update.effective_user.first_name)  # Guardar el nombre del usuario
         }
+        
+        # También actualizar o crear la caché de nombres de miembros
+        if "member_names" not in context.user_data:
+            context.user_data["member_names"] = {}
+        
+        # Guardar el nombre del miembro actual en la caché
+        member_id = member.get("id")
+        if member_id:
+            context.user_data["member_names"][str(member_id)] = member.get("name", update.effective_user.first_name)
         
         # Mostrar mensaje introductorio y pedir la descripción del gasto
         await update.message.reply_text(
@@ -317,15 +327,59 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         date_part = created_at.split("T")[0]
                         created_at = date_part
                     
-                    # Obtener el nombre del miembro que pagó
-                    member_names = context.user_data.get("member_names", {})
-                    paid_by_name = member_names.get(str(paid_by), "Desconocido")
+                    # Obtener el nombre del miembro que pagó - Simplificar usando el contexto
+                    paid_by_name = "Desconocido"
+                    
+                    # Si el pagador es el usuario actual, usar el nombre guardado en expense_data
+                    if str(paid_by) == str(expense_data.get("member_id")):
+                        paid_by_name = expense_data.get("member_name", update.effective_user.first_name)
+                        logger.info(f"[NOTIFY_EXPENSE] Usando nombre del creador del gasto: {paid_by_name}")
+                    # Si no es el usuario actual, intentar obtenerlo de la caché de nombres
+                    elif "member_names" in context.user_data and str(paid_by) in context.user_data["member_names"]:
+                        paid_by_name = context.user_data["member_names"][str(paid_by)]
+                        logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en caché: {paid_by_name}")
+                    # Solo si no está en caché, buscar en la familia
+                    else:
+                        logger.info(f"[NOTIFY_EXPENSE] Buscando nombre en la familia para ID: {paid_by}")
+                        # Intentar obtener de la familia en caché
+                        if "family" in context.user_data and "members" in context.user_data["family"]:
+                            for member in context.user_data["family"]["members"]:
+                                if str(member.get("id")) == str(paid_by):
+                                    paid_by_name = member.get("name", "Desconocido")
+                                    logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en familia: {paid_by_name}")
+                                    
+                                    # Actualizar caché
+                                    if "member_names" not in context.user_data:
+                                        context.user_data["member_names"] = {}
+                                    context.user_data["member_names"][str(paid_by)] = paid_by_name
+                                    break
                     
                     # Obtener la lista de miembros de la familia
                     logger.info(f"[NOTIFY_EXPENSE] Obteniendo miembros de la familia {family_id} para notificar sobre nuevo gasto")
                     members_status, members = FamilyService.get_family_members(family_id, token=telegram_id)
                     
                     if members_status == 200 and members:
+                        # Actualizar caché de nombres y guardar la familia para uso futuro
+                        if paid_by_name == "Desconocido":
+                            for member in members:
+                                if str(member.get("id")) == str(paid_by):
+                                    paid_by_name = member.get("name", "Desconocido")
+                                    logger.info(f"[NOTIFY_EXPENSE] Nombre encontrado en miembros obtenidos: {paid_by_name}")
+                                    break
+                        
+                        # Actualizar la caché de nombres con todos los miembros
+                        if "member_names" not in context.user_data:
+                            context.user_data["member_names"] = {}
+                        
+                        for member in members:
+                            member_id = member.get("id")
+                            member_name = member.get("name", f"Usuario {member_id}")
+                            if member_id:
+                                context.user_data["member_names"][str(member_id)] = member_name
+                        
+                        # Guardar la familia en el contexto para uso futuro
+                        context.user_data["family"] = {"members": members}
+                        
                         # Formatear el mensaje de notificación
                         notification_message = (
                             f"💸 *Nuevo Gasto Registrado*\n\n"
