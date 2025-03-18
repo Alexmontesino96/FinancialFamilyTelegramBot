@@ -425,7 +425,9 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return await show_list_options(update, context)
     elif option == view_balances_text:
         # Mostrar los balances entre miembros de la familia
-        return await show_balances(update, context)
+        # Asegurarnos de que no continúe después de mostrar los balances
+        result = await show_balances(update, context)
+        return result  # Devolver explícitamente el resultado para prevenir procesamiento adicional
     elif option == family_info_text:
         # Mostrar información de la familia
         return await mostrar_info_familia(update, context)

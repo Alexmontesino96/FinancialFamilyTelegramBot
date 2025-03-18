@@ -169,7 +169,7 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
         )
         
-        # Ya hemos mostrado el menú principal con los balances, finalizar
+        # Asegurarnos de terminar la conversación explícitamente
         return ConversationHandler.END
         
     except Exception as e:

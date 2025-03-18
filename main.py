@@ -312,7 +312,7 @@ def main():
     
     # 2. Manejador para opciones específicas del menú principal - Grupo 2 (menor prioridad)
     application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND, 
+        filters.TEXT & ~filters.COMMAND & ~filters.UpdateType.EDITED_MESSAGE, 
         handle_menu_option
     ), group=2)
     
