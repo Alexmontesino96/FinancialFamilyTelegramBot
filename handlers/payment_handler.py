@@ -653,13 +653,55 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     
                     # Obtener información del destinatario para enviar la notificación
                     print(f"Obteniendo datos del miembro receptor con ID: {to_member_id}")
-                    status_code, to_member_data = MemberService.get_member_by_id(to_member_id)
-                    print(f"Respuesta de get_member_by_id: status_code={status_code}, data={to_member_data}")
+                    to_member_data = None
+                    to_telegram_id = None
+                    to_member_name = None
                     
-                    if status_code == 200 and to_member_data:
-                        to_telegram_id = to_member_data.get("telegram_id")
-                        to_member_name = to_member_data.get("name", "")
+                    # Primero verificar si tenemos la información en el contexto
+                    if "member_names" in context.user_data and str(to_member_id) in context.user_data["member_names"]:
+                        to_member_name = context.user_data["member_names"][str(to_member_id)]
+                        print(f"Nombre del receptor encontrado en caché: {to_member_name}")
+                    
+                    # Luego buscar en los datos de la familia si están disponibles
+                    if "family" in context.user_data and "members" in context.user_data["family"]:
+                        for member in context.user_data["family"]["members"]:
+                            if str(member.get("id")) == str(to_member_id):
+                                to_member_data = member
+                                to_telegram_id = member.get("telegram_id")
+                                to_member_name = member.get("name", to_member_name)
+                                print(f"Información del receptor encontrada en datos de familia: {to_member_name}, ID: {to_telegram_id}")
+                                break
+                    
+                    # Si no se encontró en caché, intentar con el servicio
+                    if not to_telegram_id:
+                        status_code, member_response = MemberService.get_member_by_id(to_member_id)
+                        print(f"Respuesta de get_member_by_id: status_code={status_code}, data={member_response}")
                         
+                        if status_code == 200 and member_response:
+                            to_member_data = member_response
+                            to_telegram_id = member_response.get("telegram_id")
+                            to_member_name = member_response.get("name", to_member_name)
+                            print(f"Información del receptor obtenida de API: {to_member_name}, ID: {to_telegram_id}")
+                    
+                    # Si aún no tenemos nombre, intentar obtenerlo de otra forma
+                    if not to_member_name and family_id:
+                        # Obtener todos los miembros de la familia y buscar el ID
+                        status_code, family = FamilyService.get_family(family_id)
+                        if status_code == 200 and family and "members" in family:
+                            for member in family.get("members", []):
+                                if str(member.get("id")) == str(to_member_id):
+                                    to_member_data = member
+                                    to_telegram_id = member.get("telegram_id")
+                                    to_member_name = member.get("name", "")
+                                    print(f"Información del receptor encontrada en familia completa: {to_member_name}")
+                                    
+                                    # Actualizar caché para futuros usos
+                                    if "member_names" not in context.user_data:
+                                        context.user_data["member_names"] = {}
+                                    context.user_data["member_names"][str(to_member_id)] = to_member_name
+                                    break
+                    
+                    if to_member_data or to_member_name:
                         print(f"ID de Telegram del receptor: '{to_telegram_id}', Nombre: '{to_member_name}'")
                         
                         # Verificar que el ID de Telegram es válido
@@ -735,9 +777,9 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         parse_mode="Markdown"
                                     )
                     else:
-                        print(f"❌ No se pudo obtener información del receptor: {status_code}")
+                        print(f"❌ No se pudo obtener información del receptor: {to_member_id}")
                         await update.message.reply_text(
-                            "⚠️ El pago fue registrado, pero no se pudo notificar al receptor porque no se encontró su información.",
+                            f"⚠️ El pago fue registrado, pero no se pudo notificar al receptor porque no se encontró su información. ID: {to_member_id}",
                             parse_mode="Markdown"
                         )
                 
