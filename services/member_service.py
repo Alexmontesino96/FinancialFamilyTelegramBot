@@ -100,14 +100,20 @@ class MemberService:
         """Actualiza la información de un miembro.
         
         Args:
-            member_id: ID del miembro
+            member_id: ID del miembro (UUID)
             data: Datos a actualizar
-            token: Token de autenticación (opcional)
+            token: Token de autenticación o telegram_id (opcional)
             
         Returns:
             tuple: (status_code, response)
         """
         print(f"Actualizando información del miembro con ID: {member_id}")
-        status_code, response = ApiService.request("PUT", f"/members/{member_id}", data, token=token, check_status=False)
+        
+        # Preparar parámetros de consulta con el telegram_id para autorización
+        params = None
+        if token and isinstance(token, str):
+            params = {"telegram_id": token}
+        
+        status_code, response = ApiService.request("PUT", f"/members/{member_id}", data, token=token, params=params, check_status=False)
         print(f"Respuesta de update_member: status_code={status_code}, response={response}")
         return status_code, response 

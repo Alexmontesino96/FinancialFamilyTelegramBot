@@ -193,9 +193,25 @@ def set_language(user_id: str, language_code: str) -> bool:
             # Convertir el código de idioma al formato de la API (mayúsculas)
             api_language_code = BOT_TO_API_LANGUAGE.get(language_code)
             
-            # Actualizar en la API
-            MemberService.update_member(user_id, {"language": api_language_code})
-            print(f"Idioma actualizado en la API: {user_id} -> {api_language_code}")
+            # Primero, obtener el UUID del miembro a partir del telegram_id
+            status_code, member = MemberService.get_member(user_id)
+            
+            if status_code == 200 and member and "id" in member:
+                member_uuid = member["id"]
+                
+                # Ahora actualizar el idioma usando el UUID del miembro
+                status_code, response = MemberService.update_member(
+                    member_uuid,  # UUID del miembro
+                    {"language": api_language_code},  # Datos a actualizar
+                    token=user_id  # Pasar el telegram_id como token para autorización
+                )
+                
+                if status_code == 200:
+                    print(f"Idioma actualizado en la API: {user_id} (UUID: {member_uuid}) -> {api_language_code}")
+                else:
+                    print(f"Error al actualizar idioma en la API. Status code: {status_code}, Response: {response}")
+            else:
+                print(f"No se pudo obtener el UUID del miembro con telegram_id {user_id}")
         except Exception as e:
             print(f"Error al actualizar idioma en la API: {str(e)}")
             # Continuamos con el éxito local aunque falle la API
