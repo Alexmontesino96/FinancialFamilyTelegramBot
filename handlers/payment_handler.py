@@ -575,28 +575,27 @@ async def show_payment_confirmation(update: Update, context: ContextTypes.DEFAUL
 
 async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handles the user's confirmation response for creating a payment.
+    Confirma la creación de un pago entre miembros.
     
-    This function processes the user's confirmation and creates the payment
-    in the database if confirmed, or cancels the operation if rejected.
+    Esta función procesa la confirmación del usuario para un nuevo pago,
+    crea el registro en el sistema y actualiza los balances de los miembros.
     
     Args:
-        update (Update): Telegram Update object
-        context (ContextTypes.DEFAULT_TYPE): Telegram context
+        update (Update): Objeto Update de Telegram
+        context (ContextTypes.DEFAULT_TYPE): Contexto de Telegram
         
     Returns:
-        int: The next conversation state
+        int: El siguiente estado de la conversación
     """
     try:
-        # Obtener la respuesta del usuario (confirmar o cancelar)
-        response = update.message.text.strip()
+        # Obtener la respuesta del usuario
+        response = update.message.text
         
-        # Obtener los datos del pago desde el contexto
-        payment_data = context.user_data.get("payment_data", {})
-        
-        # Verificar acciones específicas
-        if response == "✅ Confirmar" or response == "✅ Pagar monto exacto":
-            # Si el usuario confirma, obtener datos necesarios para crear el pago
+        # Verificar la respuesta
+        if response == "✅ Confirmar":
+            # Obtener los datos del pago desde el contexto
+            payment_data = context.user_data.get("payment_data", {})
+            
             amount = payment_data.get("amount")
             from_member_id = payment_data.get("from_member_id")
             to_member_id = payment_data.get("to_member_id")
@@ -641,6 +640,57 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown",
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
+                
+                try:
+                    # Obtener información del miembro pagador para la notificación
+                    from_member_name = ""
+                    if "member_names" in context.user_data and str(from_member_id) in context.user_data["member_names"]:
+                        from_member_name = context.user_data["member_names"][str(from_member_id)]
+                    else:
+                        status_code, from_member_data = MemberService.get_member_by_id(from_member_id)
+                        if status_code == 200 and from_member_data:
+                            from_member_name = from_member_data.get("name", "")
+                    
+                    # Obtener información del destinatario para enviar la notificación
+                    status_code, to_member_data = MemberService.get_member_by_id(to_member_id)
+                    
+                    if status_code == 200 and to_member_data:
+                        to_telegram_id = to_member_data.get("telegram_id")
+                        to_member_name = to_member_data.get("name", "")
+                        
+                        if to_telegram_id and to_telegram_id != telegram_id:  # No notificar si es el mismo usuario
+                            # Formatear fecha si está disponible
+                            import datetime
+                            current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+                            payment_date = response_data.get("created_at", current_date)
+                            if isinstance(payment_date, str) and "T" in payment_date:
+                                payment_date = payment_date.split("T")[0].replace("-", "/")
+                            
+                            # Crear mensaje de notificación
+                            notification_message = (
+                                f"💰 *¡Has recibido un pago!*\n\n"
+                                f"*De:* {from_member_name}\n"
+                                f"*Monto:* ${amount:.2f}\n"
+                                f"*Fecha:* {payment_date}\n\n"
+                                f"Este pago ha sido registrado y actualizado en tu balance familiar."
+                            )
+                            
+                            # Enviar notificación al receptor del pago
+                            try:
+                                await context.bot.send_message(
+                                    chat_id=to_telegram_id,
+                                    text=notification_message,
+                                    parse_mode="Markdown"
+                                )
+                                print(f"Notificación enviada a {to_member_name} (ID: {to_telegram_id})")
+                            except Exception as e:
+                                print(f"Error al enviar notificación: {str(e)}")
+                    else:
+                        print(f"No se pudo obtener información del receptor: {status_code}")
+                
+                except Exception as e:
+                    print(f"Error al enviar notificación de pago: {str(e)}")
+                    # No interrumpir el flujo principal si falla la notificación
                 
                 # Limpiar los datos del pago del contexto
                 if "payment_data" in context.user_data:
