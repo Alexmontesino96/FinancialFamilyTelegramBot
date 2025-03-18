@@ -206,7 +206,9 @@ def main():
             MessageHandler(filters.Regex("^💸 Crear Gasto$"), crear_gasto)
         ],
         states={
-            DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_description)],
+            DESCRIPTION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_description)
+            ],
             AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_expense_amount)],
             SELECT_MEMBERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_members_for_expense)],
             CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_expense)]
@@ -217,6 +219,7 @@ def main():
         name="expense_conversation",
         persistent=False
     )
+    logger.info("Conversation handlers configurados correctamente")
     
     payment_conv_handler = ConversationHandler(
         entry_points=[
@@ -251,22 +254,34 @@ def main():
     # Añadir todos los handlers en el orden correcto
     # El orden es importante: desde el más específico hasta el más general
     
-    # 1. Los handlers de conversación (manejan flujos específicos)
-    application.add_handler(family_conv_handler)
-    application.add_handler(edit_conv_handler)
-    application.add_handler(expense_conv_handler)
-    application.add_handler(payment_conv_handler)
-    application.add_handler(list_conv_handler)
+    # 1. Los handlers de conversación (manejan flujos específicos) - Grupo 0 (prioridad máxima)
+    application.add_handler(family_conv_handler, group=0)
+    application.add_handler(edit_conv_handler, group=0)
+    application.add_handler(expense_conv_handler, group=0)
+    application.add_handler(payment_conv_handler, group=0)
+    application.add_handler(list_conv_handler, group=0)
     
-    # Añadir los manejadores del sistema de idiomas
+    # Añadir middleware para logging de mensajes
+    async def log_message(update, context):
+        """Log each message for debugging purposes"""
+        if hasattr(update, 'message') and update.message and hasattr(update.message, 'text'):
+            message_text = update.message.text
+            user_id = update.effective_user.id if update.effective_user else 'Unknown'
+            conversation_key = context.chat_data.get('_conversation_key', 'None')
+            logger.info(f"[MESSAGE_DEBUG] User: {user_id}, Text: '{message_text}', Conversation: {conversation_key}")
+        return None
+    
+    application.add_handler(MessageHandler(filters.ALL, log_message), group=-1)  # group=-1 para que se ejecute primero
+    
+    # Añadir los manejadores del sistema de idiomas - Grupo 1
     for handler in get_language_handlers():
-        application.add_handler(handler)
+        application.add_handler(handler, group=1)
     
-    # 2. Manejador para opciones específicas del menú principal (acepta cualquier texto)
+    # 2. Manejador para opciones específicas del menú principal - Grupo 2 (menor prioridad)
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, 
         handle_menu_option
-    ))
+    ), group=2)
     
     # 3. Manejador para texto desconocido (debe ser el último) - Ya no es necesario porque handle_menu_option
     # ahora maneja cualquier texto desconocido internamente

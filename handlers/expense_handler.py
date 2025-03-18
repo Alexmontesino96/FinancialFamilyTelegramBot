@@ -17,6 +17,7 @@ from utils.helpers import send_error
 from services.member_service import MemberService
 from services.family_service import FamilyService
 import traceback
+from languages.utils.translator import get_message
 
 # Eliminamos la importación circular
 # from handlers.menu_handler import show_main_menu
@@ -83,11 +84,12 @@ async def crear_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Mostrar mensaje introductorio y pedir la descripción del gasto
         await update.message.reply_text(
-            Messages.CREATE_EXPENSE_INTRO,
+            get_message(telegram_id, "CREATE_EXPENSE_INTRO"),
             parse_mode="Markdown",
             reply_markup=Keyboards.get_cancel_keyboard()
         )
         # Pasar al siguiente estado: pedir descripción
+        logger.info(f"[DEBUG] crear_gasto: Pasando al estado DESCRIPTION={DESCRIPTION}")
         return DESCRIPTION
         
     except Exception as e:
@@ -115,11 +117,17 @@ async def get_expense_description(update: Update, context: ContextTypes.DEFAULT_
         # Obtener y validar la descripción del gasto
         description = update.message.text.strip()
         
+        # Obtener el ID de Telegram para las traducciones
+        telegram_id = str(update.effective_user.id)
+        
+        # Registrar la descripción recibida para depuración
+        logger.info(f"[DEBUG] get_expense_description: Recibido mensaje exacto: '{description}'")
+        
         # Verificar si el usuario quiere cancelar la operación
         if description == "❌ Cancelar":
             await update.message.reply_text(
-                Messages.CANCEL_OPERATION,
-                reply_markup=Keyboards.get_main_menu_keyboard()
+                get_message(telegram_id, "CANCEL_OPERATION"),
+                reply_markup=Keyboards.get_main_menu_keyboard(telegram_id)
             )
             # Limpiar datos temporales
             if "expense_data" in context.user_data:
@@ -129,7 +137,7 @@ async def get_expense_description(update: Update, context: ContextTypes.DEFAULT_
         # Verificar que la descripción no esté vacía
         if not description:
             await update.message.reply_text(
-                "La descripción no puede estar vacía. Por favor, ingresa una descripción para el gasto:",
+                get_message(telegram_id, "ERROR_EMPTY_DESCRIPTION"),
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
             # Permanecer en el mismo estado para pedir nuevamente la descripción
@@ -138,9 +146,12 @@ async def get_expense_description(update: Update, context: ContextTypes.DEFAULT_
         # Guardar la descripción en el contexto del usuario
         context.user_data["expense_data"]["description"] = description
         
+        # Pedir el monto del gasto usando mensaje traducido
+        expense_amount_msg = get_message(telegram_id, "CREATE_EXPENSE_AMOUNT").format(description=description)
+        
         # Pedir el monto del gasto
         await update.message.reply_text(
-            Messages.CREATE_EXPENSE_AMOUNT.format(description=description),
+            expense_amount_msg,
             parse_mode="Markdown",
             reply_markup=Keyboards.get_cancel_keyboard()
         )
