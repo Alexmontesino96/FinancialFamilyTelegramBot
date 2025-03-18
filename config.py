@@ -28,6 +28,20 @@ if not BOT_TOKEN:
 # API configuration
 API_BASE_URL = os.getenv('API_BASE_URL_RENDER')
 
+# Verificar que API_BASE_URL tenga un valor válido
+if not API_BASE_URL:
+    # Intentar con la variable alternativa por compatibilidad
+    API_BASE_URL = os.getenv('API_BASE_URL')
+    
+    # Si aún no hay valor, usar un valor predeterminado
+    if not API_BASE_URL:
+        API_BASE_URL = "https://financialfamilyapi.onrender.com"
+        logger.warning(f"No se encontró API_BASE_URL en variables de entorno. Usando valor por defecto: {API_BASE_URL}")
+    else:
+        logger.info(f"Usando API_BASE_URL: {API_BASE_URL}")
+else:
+    logger.info(f"Usando API_BASE_URL_RENDER: {API_BASE_URL}")
+
 # Conversation states for different flows
 # Start flow - Family creation and joining
 ASK_FAMILY_CODE = 0  # State for asking if user wants to create or join a family
