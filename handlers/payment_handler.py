@@ -51,9 +51,22 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         int: The next conversation state
     """
     try:
+        # Limpiar cualquier contexto de conversación previa para evitar problemas
+        # Limpiamos datos de expense que podrían causar conflictos
+        if "expense_data" in context.user_data:
+            print("Limpiando contexto expense_data previo para evitar conflictos")
+            del context.user_data["expense_data"]
+            
         # Limpiar datos previos para evitar conflictos
         if "payment_data" in context.user_data:
+            print("Limpiando contexto payment_data previo para evitar conflictos")
             del context.user_data["payment_data"]
+            
+        # Limpiar estado de conversación actual si existe
+        if '_conversation_key' in context.chat_data:
+            print(f"Limpiando conversación previa: {context.chat_data.get('_conversation_key')}")
+        
+        print(f"Iniciando flujo de registrar_pago para usuario {update.effective_user.id}")
         
         # Inicializar estructura de datos para el pago en el contexto
         context.user_data["payment_data"] = {}
@@ -113,6 +126,7 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Obtener los balances de la familia
         status_code, balances = FamilyService.get_family_balances(family_id, telegram_id)
+        print(f"Respuesta de get_family_balances: status_code={status_code}, response={balances}")
         
         # Crear diccionarios para mapear miembros a sus saldos
         balances_dict = {}  # Lo que otros te deben a ti
@@ -128,32 +142,22 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if str(balance.get("member_id")) == str(from_member_id):
                     # Procesar sus deudas (lo que debe a otros)
                     for debt in balance.get("debts", []):
+                        to_id = debt.get("to_id")
                         to_name = debt.get("to")
                         amount = debt.get("amount", 0)
                         
-                        # Buscar el ID del miembro por su nombre
-                        to_id = None
-                        for member in members:
-                            if member.get("name") == to_name:
-                                to_id = member.get("id")
-                                break
-                        
                         if to_id and amount > 0:
+                            print(f"Encontrada deuda: Usuario debe ${amount} a {to_name} (ID: {to_id})")
                             debts_dict[str(to_id)] = amount
                             
                     # Procesar sus créditos (lo que otros le deben)
                     for credit in balance.get("credits", []):
+                        from_id = credit.get("from_id")
                         from_name = credit.get("from")
                         amount = credit.get("amount", 0)
                         
-                        # Buscar el ID del miembro por su nombre
-                        from_id = None
-                        for member in members:
-                            if member.get("name") == from_name:
-                                from_id = member.get("id")
-                                break
-                        
                         if from_id and amount > 0:
+                            print(f"Encontrado crédito: {from_name} (ID: {from_id}) debe ${amount} al usuario")
                             balances_dict[str(from_id)] = amount
                     
                     break  # Una vez encontrado el balance del usuario, salimos del bucle
@@ -174,6 +178,7 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
             deudas_mensaje = "📊 *Resumen de tus deudas:*\n" + "\n".join(deudas_lista) + "\n\n"
         else:
             # Si el usuario no tiene deudas, mostrar mensaje y regresar al menú principal
+            print(f"El usuario {telegram_id} no tiene deudas pendientes.")
             await update.message.reply_text(
                 Messages.NO_DEBTS,
                 parse_mode="Markdown",
@@ -208,6 +213,7 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Verificar si después del filtrado queda algún miembro para mostrar
         if not members_with_debt:
             # Caso especial: hay deudas pero no con los miembros actuales de la familia
+            print(f"No se encontraron miembros con deudas actuales para el usuario {telegram_id}")
             await update.message.reply_text(
                 "No se encontraron miembros en tu familia a los que debas dinero actualmente.",
                 parse_mode="Markdown",
@@ -232,10 +238,14 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         
+        print(f"Avanzando al estado SELECT_TO_MEMBER para usuario {telegram_id}")
         # Pasar al siguiente estado: seleccionar destinatario
         return SELECT_TO_MEMBER
         
     except Exception as e:
+        print(f"Error en registrar_pago: {str(e)}")
+        import traceback
+        traceback.print_exc()
         await send_error(update, context, f"Error al iniciar el registro de pago: {str(e)}")
         await _show_menu(update, context)
         return ConversationHandler.END

@@ -16,6 +16,7 @@ from utils.context_manager import ContextManager
 from utils.helpers import send_error, create_qr_code
 import traceback
 from languages.utils.translator import get_message
+import time
 
 # Eliminamos la importación circular
 # from handlers.menu_handler import show_main_menu
@@ -50,6 +51,18 @@ async def show_balances(update: Update, context: ContextTypes.DEFAULT_TYPE):
         int: The next conversation state
     """
     try:
+        # Verificar si ya hemos mostrado balances en los últimos segundos
+        # para evitar procesamiento duplicado
+        last_balance_time = context.user_data.get("last_balance_time", 0)
+        current_time = time.time()
+        
+        if current_time - last_balance_time < 2:  # 2 segundos de protección
+            print(f"Evitando mostrar balances duplicados. Último balance mostrado hace {current_time - last_balance_time} segundos")
+            return ConversationHandler.END
+            
+        # Actualizar timestamp de último balance mostrado
+        context.user_data["last_balance_time"] = current_time
+        
         # Obtener el ID de la familia del contexto o del usuario
         family_id = ContextManager.get_family_id(context)
         print(f"Obteniendo balances para la familia con ID: {family_id}")

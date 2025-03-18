@@ -200,7 +200,8 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", edit_cancel),
-            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), edit_cancel)
+            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), edit_cancel),
+            CommandHandler("menu", show_main_menu)
         ],
         name="edit_conversation",
         persistent=False,
@@ -215,21 +216,22 @@ def main():
         ],
         states={
             DESCRIPTION: [
-                MessageHandler(filters.TEXT, get_expense_description)
+                MessageHandler(filters.TEXT & ~filters.Regex("^💳 Registrar Pago$|^💳 Register Payment$"), get_expense_description)
             ],
             AMOUNT: [
-                MessageHandler(filters.TEXT, get_expense_amount)
+                MessageHandler(filters.TEXT & ~filters.Regex("^💳 Registrar Pago$|^💳 Register Payment$"), get_expense_amount)
             ],
             SELECT_MEMBERS: [
-                MessageHandler(filters.TEXT, select_members_for_expense)
+                MessageHandler(filters.TEXT & ~filters.Regex("^💳 Registrar Pago$|^💳 Register Payment$"), select_members_for_expense)
             ],
             CONFIRM: [
-                MessageHandler(filters.TEXT, confirm_expense)
+                MessageHandler(filters.TEXT & ~filters.Regex("^💳 Registrar Pago$|^💳 Register Payment$"), confirm_expense)
             ]
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), cancel)
+            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), cancel),
+            CommandHandler("menu", show_main_menu)
         ],
         name="expense_conversation",
         persistent=False,
@@ -250,7 +252,8 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), cancel)
+            MessageHandler(filters.Regex("^❌ Cancelar$|^❌ Cancel$"), cancel),
+            CommandHandler("menu", show_main_menu)
         ],
         name="payment_conversation",
         persistent=False,
@@ -283,8 +286,9 @@ def main():
     # 1. Los handlers de conversación (manejan flujos específicos) - Grupo 0 (prioridad máxima)
     application.add_handler(family_conv_handler, group=0)
     application.add_handler(edit_conv_handler, group=0)
+    # Prioritizar payment_conv_handler sobre expense_conv_handler
+    application.add_handler(payment_conv_handler, group=0)  
     application.add_handler(expense_conv_handler, group=0)
-    application.add_handler(payment_conv_handler, group=0)
     application.add_handler(list_conv_handler, group=0)
     
     # Añadir middleware para logging de mensajes
@@ -302,6 +306,17 @@ def main():
                     break
             
             logger.info(f"[MESSAGE_DEBUG] User: {user_id}, Text: '{message_text}', Conversation: {conversation_key}, State: {current_state}")
+            
+            # Verificar si el mensaje es una opción del menú principal y limpiar cualquier estado de conversación
+            if any(message_text.startswith(prefix) for prefix in ["💸", "💰", "📜", "💳", "✏️", "ℹ️", "🔗", "🌍"]):
+                # Es una opción del menú principal, intentar limpiar estados de conversación pendientes
+                for handler_name in ["expense_conversation", "payment_conversation", "edit_conversation", "list_conversation"]:
+                    if f"{handler_name}_state" in context.chat_data:
+                        logger.info(f"[CLEAN_CONVERSATION] Limpiando estado pendiente: {handler_name}")
+                        del context.chat_data[f"{handler_name}_state"]
+                if "_conversation_key" in context.chat_data:
+                    logger.info(f"[CLEAN_CONVERSATION] Limpiando conversación: {context.chat_data['_conversation_key']}")
+                    del context.chat_data["_conversation_key"]
         return None
     
     application.add_handler(MessageHandler(filters.ALL, log_message), group=-1)  # group=-1 para que se ejecute primero
@@ -311,8 +326,24 @@ def main():
         application.add_handler(handler, group=1)
     
     # 2. Manejador para opciones específicas del menú principal - Grupo 2 (menor prioridad)
+    # Añadir una función auxiliar para verificar si un mensaje NO debe ser procesado
+    # porque ya fue manejado por otros handlers
+    def not_already_handled(update):
+        """Verifica si el mensaje no ha sido ya manejado por otro handler."""
+        # Si no hay mensaje, no procesamos
+        if not hasattr(update, 'message') or not update.message or not hasattr(update.message, 'text'):
+            return False
+            
+        # Acceder al contexto del usuario
+        context = update._effective_user_context
+        if context and context.user_data.get("balances_shown"):
+            logger.info(f"[FILTER] Mensaje ya procesado por otro handler (balances_shown): {update.message.text}")
+            return False
+            
+        return True
+    
     application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & ~filters.UpdateType.EDITED_MESSAGE, 
+        filters.TEXT & ~filters.COMMAND & ~filters.UpdateType.EDITED_MESSAGE & filters.create(not_already_handled), 
         handle_menu_option
     ), group=2)
     

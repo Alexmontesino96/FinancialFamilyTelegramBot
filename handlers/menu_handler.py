@@ -364,6 +364,24 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Imprimir la opción para depuración
     print(f"Opción seleccionada: {option}")
     
+    # Limpiar estado de conversación pendiente para evitar conflictos
+    # Esto ayudará a evitar que los mensajes de menú sean capturados por handlers incorrectos
+    for handler_name in ["expense_conversation", "payment_conversation", "edit_conversation", "list_conversation"]:
+        if f"{handler_name}_state" in context.chat_data:
+            print(f"Limpiando estado pendiente: {handler_name}")
+            del context.chat_data[f"{handler_name}_state"]
+    if "_conversation_key" in context.chat_data:
+        print(f"Limpiando conversación: {context.chat_data['_conversation_key']}")
+        del context.chat_data["_conversation_key"]
+    
+    # Limpiar datos temporales de conversaciones previas
+    if "expense_data" in context.user_data:
+        print("Limpiando datos de expense_data")
+        del context.user_data["expense_data"]
+    if "payment_data" in context.user_data:
+        print("Limpiando datos de payment_data")
+        del context.user_data["payment_data"]
+    
     # Verificar si ya tenemos el ID de familia en el contexto
     if "family_id" in context.user_data:
         family_id = context.user_data["family_id"]
@@ -415,6 +433,7 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return await listar_gastos(update, context)
     elif option == register_payment_text:
         # Iniciar el flujo de registro de pagos
+        print(f"Redirigiendo a registrar_pago para {telegram_id}")
         return await registrar_pago(update, context)
     elif option == list_payments_text:
         # OBSOLETO: Ahora se usa Listar Registros > Listar Pagos
@@ -427,6 +446,14 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Mostrar los balances entre miembros de la familia
         # Asegurarnos de que no continúe después de mostrar los balances
         result = await show_balances(update, context)
+        
+        # Añadir un log para depuración
+        print(f"Ejecutando view_balances para {telegram_id}, resultado: {result}")
+        
+        # Setear una bandera para indicar que ya mostramos los balances
+        # y así evitar procesamiento adicional
+        context.user_data["balances_shown"] = True
+        
         return result  # Devolver explícitamente el resultado para prevenir procesamiento adicional
     elif option == family_info_text:
         # Mostrar información de la familia
@@ -455,6 +482,13 @@ async def handle_unknown_text(update: Update, context: ContextTypes.DEFAULT_TYPE
     Returns:
         int: The next conversation state
     """
+    # Verificar si acabamos de mostrar los balances
+    if context.user_data.get("balances_shown"):
+        # Limpiar la bandera para futuras interacciones
+        del context.user_data["balances_shown"]
+        print("Evitando procesamiento adicional después de mostrar balances")
+        return ConversationHandler.END
+        
     # Obtener ID del usuario para traducciones
     telegram_id = str(update.effective_user.id)
     
