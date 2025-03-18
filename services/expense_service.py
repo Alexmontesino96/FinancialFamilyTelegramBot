@@ -8,6 +8,7 @@ It handles expense creation, retrieval, updating, and deletion.
 from services.api_service import ApiService
 import traceback
 import requests
+from config import API_BASE_URL
 
 class ExpenseService:
     """
