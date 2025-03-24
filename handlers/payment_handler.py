@@ -128,14 +128,14 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if status_code == 200 and balances:
             # Buscamos los balances específicos para el usuario actual
-            for balance in balances:
+        for balance in balances:
                 # Si este balance corresponde al usuario actual
                 if str(balance.get("member_id")) == str(from_member_id):
                     # Procesar sus deudas (lo que debe a otros)
-                    for debt in balance.get("debts", []):
+                for debt in balance.get("debts", []):
                         to_name = debt.get("to")
-                        amount = debt.get("amount", 0)
-                        
+                    amount = debt.get("amount", 0)
+                    
                         # Buscar el ID del miembro por su nombre
                         to_id = None
                         for member in members:
@@ -156,7 +156,7 @@ async def registrar_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         for member in members:
                             if member.get("name") == from_name:
                                 from_id = member.get("id")
-                                break
+                            break
                         
                         if from_id and amount > 0:
                             balances_dict[str(from_id)] = amount
@@ -262,13 +262,13 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Verificar si el usuario canceló la operación
         if selected_text == "❌ Cancelar":
-            await update.message.reply_text(
+        await update.message.reply_text(
                 Messages.CANCEL_OPERATION,
-                reply_markup=Keyboards.remove_keyboard()
-            )
-            await _show_menu(update, context)
-            return ConversationHandler.END
-        
+            reply_markup=Keyboards.remove_keyboard()
+        )
+        await _show_menu(update, context)
+        return ConversationHandler.END
+    
         # Verificar si ya tenemos un miembro seleccionado en el contexto
         payment_data = context.user_data.get("payment_data", {})
         to_member_id = payment_data.get("to_member_id")
@@ -355,8 +355,8 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for member in members_with_debt:
                 if member.get("name") == member_name:
                     selected_member = member
-                    break
-            
+            break
+    
             if not selected_member:
                 # Si no se encuentra el miembro, mostrar error y volver a pedir
                 buttons = []
@@ -367,16 +367,16 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     buttons.append([button_text])
                 buttons.append(["❌ Cancelar"])
                 
-                await update.message.reply_text(
+        await update.message.reply_text(
                     f"Miembro '{member_name}' no encontrado. Por favor, selecciona un miembro de la lista:",
                     reply_markup=ReplyKeyboardMarkup(
                         buttons,
                         one_time_keyboard=True,
                         resize_keyboard=True
                     )
-                )
-                return SELECT_TO_MEMBER
-            
+        )
+        return SELECT_TO_MEMBER
+    
             # Guardar el ID del miembro destinatario en el contexto
             to_member_id = selected_member.get("id")
             to_member_name = selected_member.get("name")
@@ -391,10 +391,10 @@ async def select_to_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [f"Pago Total: ${debt_amount:.2f}"],
                 ["❌ Cancelar"]
             ]
-            
-            await update.message.reply_text(
+    
+    await update.message.reply_text(
                 f"Has seleccionado a *{to_member_name}*.\nDeuda actual: ${debt_amount:.2f}\n\n¿Qué tipo de pago deseas realizar?",
-                parse_mode="Markdown",
+        parse_mode="Markdown",
                 reply_markup=ReplyKeyboardMarkup(
                     payment_options,
                     one_time_keyboard=True,
@@ -464,7 +464,7 @@ async def get_payment_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
             return PAYMENT_AMOUNT
-            
+        
         # Si no es una opción especial, intentar convertir a número
         try:
             # Reemplazar comas por puntos para manejar diferentes formatos numéricos
@@ -513,7 +513,7 @@ async def get_payment_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
             return PAYMENT_AMOUNT
-            
+        
         # Guardar el monto validado en el contexto
         context.user_data["payment_data"]["amount"] = amount
         
@@ -566,11 +566,11 @@ async def show_payment_confirmation(update: Update, context: ContextTypes.DEFAUL
                 confirmation_message += f"\n\n⚠️ Este pago cubrirá parcialmente tu deuda de ${debt_amount:.2f}."
                 confirmation_message += f"\nQuedarán pendientes: ${remaining:.2f}"
         
-        await update.message.reply_text(
+    await update.message.reply_text(
             confirmation_message,
-            parse_mode="Markdown",
-            reply_markup=Keyboards.get_confirmation_keyboard()
-        )
+        parse_mode="Markdown",
+        reply_markup=Keyboards.get_confirmation_keyboard()
+    )
         
         # Pasar al siguiente estado: confirmar pago
         return PAYMENT_CONFIRM
@@ -754,20 +754,11 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             if payment_status == "PENDING" and payment_id:
                                 # Crear teclado inline con botones para confirmar/rechazar
                                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                                import json
                                 
-                                # Crear datos para los callbacks
-                                confirm_data = json.dumps({
-                                    "type": "payment",
-                                    "action": "confirm",
-                                    "payment_id": payment_id
-                                })
-                                
-                                reject_data = json.dumps({
-                                    "type": "payment",
-                                    "action": "reject",
-                                    "payment_id": payment_id
-                                })
+                                # Simplificar los datos del callback para evitar exceder el límite de 64 bytes
+                                # Usamos formato p:ID:a donde p=payment, ID=ID del pago, a=acción (c=confirm, r=reject)
+                                confirm_data = f"p:{payment_id}:c"
+                                reject_data = f"p:{payment_id}:r"
                                 
                                 keyboard = [
                                     [
@@ -941,16 +932,16 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return ConversationHandler.END
         else:
             # Si la respuesta no es reconocida
-            await update.message.reply_text(
+        await update.message.reply_text(
                 "Opción no reconocida. Por favor, selecciona Confirmar o Cancelar.",
                 reply_markup=Keyboards.get_confirmation_keyboard()
-            )
+        )
             return PAYMENT_CONFIRM
             
     except Exception as e:
         await send_error(update, context, f"Error al confirmar el pago: {str(e)}")
         return ConversationHandler.END
-
+    
 async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Muestra la lista de pagos de la familia.
@@ -1019,7 +1010,7 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as edit_error:
                 # Si hay un error al editar el mensaje, enviamos uno nuevo
-                await update.message.reply_text(
+            await update.message.reply_text(
                     Messages.NO_PAYMENTS,
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )

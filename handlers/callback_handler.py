@@ -34,17 +34,26 @@ async def handle_payment_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     
     try:
-        # Extraer los datos del callback
-        callback_data = json.loads(query.data)
+        # Extraer los datos del callback en formato simplificado p:ID:a
+        callback_data = query.data
         
-        # Verificar que sea un callback de tipo 'payment'
-        if callback_data.get("type") != "payment":
+        # Verificar que sea un callback de tipo 'payment' (empieza con 'p:')
+        if not callback_data.startswith('p:'):
             await query.answer("Tipo de callback no reconocido")
             return
         
+        # Dividir los datos: [p, payment_id, action]
+        parts = callback_data.split(':')
+        if len(parts) != 3:
+            await query.answer("Formato de callback inválido")
+            return
+        
         # Obtener la acción y el ID del pago
-        action = callback_data.get("action")
-        payment_id = callback_data.get("payment_id")
+        payment_id = parts[1]
+        action_code = parts[2]  # 'c' para confirmar, 'r' para rechazar
+        
+        # Convertir código de acción a acción completa
+        action = "confirm" if action_code == 'c' else "reject"
         
         if not payment_id:
             await query.answer("ID de pago no encontrado en el callback")
