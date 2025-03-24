@@ -124,7 +124,7 @@ async def get_expense_description(update: Update, context: ContextTypes.DEFAULT_
             # Limpiar datos temporales
             if "expense_data" in context.user_data:
                 del context.user_data["expense_data"]
-                return await _show_menu(update, context)
+            return await _show_menu(update, context)
         
         # Verificar que la descripción no esté vacía
         if not description:
@@ -270,12 +270,13 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
         # Verificar si el usuario quiere cancelar la operación
         if selection == "❌ Cancelar":
             await update.message.reply_text(
-            Messages.CANCEL_OPERATION,
-            reply_markup=Keyboards.get_main_menu_keyboard())
+                Messages.CANCEL_OPERATION,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
             # Limpiar datos temporales
             if "expense_data" in context.user_data:
                 del context.user_data["expense_data"]
-                return await _show_menu(update, context)
+            return await _show_menu(update, context)
         
         # Obtener datos del gasto y de la familia
         expense_data = context.user_data.get("expense_data", {})
@@ -336,8 +337,8 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                 "Cuando termines, presiona \"✓ Continuar\""
             )
             await update.message.reply_text(
-            message,
-            reply_markup=Keyboards.get_select_members_keyboard(filtered_members, selected_members)
+                message,
+                reply_markup=Keyboards.get_select_members_keyboard(filtered_members, selected_members)
             )
             
             # Mantener el mismo estado para permitir la selección de miembros
@@ -596,8 +597,9 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if status_code != 200 or not member or not member.get("family_id"):
             # Si el usuario no está en una familia, mostrar error
             await update.message.reply_text(
-            Messages.ERROR_NOT_IN_FAMILY,
-            reply_markup=Keyboards.remove_keyboard())
+                Messages.ERROR_NOT_IN_FAMILY,
+                reply_markup=Keyboards.remove_keyboard()
+            )
             return ConversationHandler.END
             
         # Obtener el ID de la familia del usuario
@@ -649,8 +651,8 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Verificar si la familia tiene gastos registrados
         if not expenses or len(expenses) == 0:
             await update.message.reply_text(
-            Messages.NO_EXPENSES,
-            parse_mode="Markdown"
+                Messages.NO_EXPENSES,
+                parse_mode="Markdown"
             )
             return await _show_menu(update, context)
             
