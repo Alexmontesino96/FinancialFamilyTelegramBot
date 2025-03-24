@@ -191,13 +191,13 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
             # Verificar que el monto sea positivo
             if amount <= 0:
-                await update.message.reply_text(
+            await update.message.reply_text(
                     "El monto debe ser un número positivo. Por favor, ingresa el monto nuevamente:",
-                    reply_markup=Keyboards.get_cancel_keyboard()
-                )
+                reply_markup=Keyboards.get_cancel_keyboard()
+            )
                 # Permanecer en el mismo estado para pedir nuevamente el monto
-                return AMOUNT
-                
+            return AMOUNT
+        
         except ValueError:
             # Si no se puede convertir a número, mostrar error
             await update.message.reply_text(
@@ -218,7 +218,7 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
         print(f"Error en get_expense_amount: {str(e)}")
         traceback.print_exc()
         await send_error(update, context, "Ocurrió un error al procesar el monto del gasto.")
-        return ConversationHandler.END
+            return ConversationHandler.END
 
 async def show_expense_division_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -407,7 +407,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                 if members_status != 200 or not members:
                     await update.message.reply_text(
                         "No se pudo obtener la lista de miembros de la familia. Por favor, intenta nuevamente.",
-                        reply_markup=Keyboards.get_main_menu_keyboard()
+                reply_markup=Keyboards.get_main_menu_keyboard()
                     )
                     return ConversationHandler.END
                 
@@ -446,8 +446,8 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                         "No se pudo obtener la lista de miembros de la familia. Por favor, intenta nuevamente.",
                         reply_markup=Keyboards.get_main_menu_keyboard()
                     )
-                    return ConversationHandler.END
-                
+            return ConversationHandler.END
+        
                 context.user_data["family_members"] = members
             else:
                 members = context.user_data["family_members"]
@@ -953,39 +953,38 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # Finalizar conversación
                 return ConversationHandler.END
-            else:
+        else:
                 # Si hubo un error, mostrar el mensaje de error
-                error_message = "Error desconocido"
-                if isinstance(response, dict) and "detail" in response:
-                    error_message = response["detail"]
-                
+            error_message = "Error desconocido"
+            if isinstance(response, dict) and "detail" in response:
+                error_message = response["detail"]
+        
                 await update.message.reply_text(
-                    f"❌ Error al crear el gasto: {error_message}",
+                        f"❌ Error al crear el gasto: {error_message}",
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
                 return ConversationHandler.END
         
-        elif response == "❌ Cancelar":
-            # Si el usuario cancela, mostrar mensaje de cancelación
-            await update.message.reply_text(
-                Messages.CANCEL_OPERATION,
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
+            elif response == "❌ Cancelar":
+                # Si el usuario cancela, mostrar mensaje de cancelación
+                await update.message.reply_text(
+                    Messages.CANCEL_OPERATION,
+                    reply_markup=Keyboards.get_main_menu_keyboard())
+                
+                # Limpiar los datos del gasto del contexto
+                if "expense_data" in context.user_data:
+                    del context.user_data["expense_data"]`
             
-            # Limpiar los datos del gasto del contexto
-            if "expense_data" in context.user_data:
-                del context.user_data["expense_data"]
-            
-            # Finalizar conversación
-            return ConversationHandler.END
+                # Finalizar conversación
+                return ConversationHandler.END
         
-        else:
-            # Si la respuesta no es reconocida, pedir que seleccione una opción válida
-            await update.message.reply_text(
-                "Por favor, selecciona 'Confirmar' o 'Cancelar'.",
-                reply_markup=Keyboards.get_confirmation_keyboard()
-            )
-            return CONFIRM
+            else:
+                # Si la respuesta no es reconocida, pedir que seleccione una opción válida
+                await update.message.reply_text(
+                    "Por favor, selecciona 'Confirmar' o 'Cancelar'.",
+                    reply_markup=Keyboards.get_confirmation_keyboard()
+                )
+                return CONFIRM
         
     except Exception as e:
         # Manejo de errores inesperados

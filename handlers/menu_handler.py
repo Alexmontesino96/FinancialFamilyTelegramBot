@@ -168,11 +168,11 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         traceback.print_exc()
         
         # En caso de error, mostrar solo el menú básico
-        await update.message.reply_text(
-            Messages.MAIN_MENU,
-            reply_markup=Keyboards.get_main_menu_keyboard()
-        )
-        return ConversationHandler.END
+    await update.message.reply_text(
+        Messages.MAIN_MENU,
+        reply_markup=Keyboards.get_main_menu_keyboard()
+    )
+    return ConversationHandler.END
 
 async def show_list_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
