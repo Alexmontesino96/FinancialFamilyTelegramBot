@@ -50,8 +50,9 @@ class MemberService:
             print(f"Detectado ID formato UUID, usando endpoint UUID")
             return MemberService.get_member_by_uuid(member_id, token)
         
-        # Si no es UUID, continuar con el endpoint original para IDs numéricos
-        status_code, response = ApiService.request("GET", f"/members/id/{member_id}", token=token, check_status=False)
+        # Si no es UUID, continuar con el endpoint para todos los tipos de IDs
+        # Usar la ruta correcta: /members/{id} en lugar de /members/id/{id}
+        status_code, response = ApiService.request("GET", f"/members/{member_id}", token=token, check_status=False)
         print(f"Respuesta de get_member_by_id: status_code={status_code}, response={response}")
         return status_code, response
     
@@ -77,7 +78,7 @@ class MemberService:
                 print(f"Se pasó un diccionario sin campo 'id' a get_member_by_uuid, usando como está: {uuid}")
                 
         print(f"Obteniendo información del miembro con UUID: {uuid}")
-        status_code, response = ApiService.request("GET", f"/members/uuid/{uuid}", token=token, check_status=False)
+        status_code, response = ApiService.request("GET", f"/members/{uuid}", token=token, check_status=False)
         
         # Si la API no tiene un endpoint específico para UUID, intentar obtenerlo por otra vía
         if status_code == 404 or status_code >= 400:
