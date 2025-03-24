@@ -57,7 +57,7 @@ async def crear_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Si el usuario no está en una familia, mostrar error y terminar la conversación
         if status_code != 200 or not member or not member.get("family_id"):
-            await update.message.reply_text(
+                await update.message.reply_text(
                 Messages.ERROR_NOT_IN_FAMILY,
                 reply_markup=Keyboards.remove_keyboard()
             )
@@ -117,7 +117,7 @@ async def get_expense_description(update: Update, context: ContextTypes.DEFAULT_
         
         # Verificar si el usuario quiere cancelar la operación
         if description == "❌ Cancelar":
-            await update.message.reply_text(
+                await update.message.reply_text(
                 Messages.CANCEL_OPERATION,
                 reply_markup=Keyboards.get_main_menu_keyboard()
             )
@@ -128,7 +128,7 @@ async def get_expense_description(update: Update, context: ContextTypes.DEFAULT_
         
         # Verificar que la descripción no esté vacía
         if not description:
-            await update.message.reply_text(
+                await update.message.reply_text(
                 "La descripción no puede estar vacía. Por favor, ingresa una descripción para el gasto:",
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
@@ -174,7 +174,7 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         # Verificar si el usuario quiere cancelar la operación
         if amount_text == "❌ Cancelar":
-            await update.message.reply_text(
+                await update.message.reply_text(
                 Messages.CANCEL_OPERATION,
                 reply_markup=Keyboards.get_main_menu_keyboard()
             )
@@ -191,16 +191,16 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
             # Verificar que el monto sea positivo
             if amount <= 0:
-            await update.message.reply_text(
+                await update.message.reply_text(
                     "El monto debe ser un número positivo. Por favor, ingresa el monto nuevamente:",
-                reply_markup=Keyboards.get_cancel_keyboard()
-            )
+                    reply_markup=Keyboards.get_cancel_keyboard()
+                )
                 # Permanecer en el mismo estado para pedir nuevamente el monto
-            return AMOUNT
+                return AMOUNT
         
         except ValueError:
             # Si no se puede convertir a número, mostrar error
-            await update.message.reply_text(
+                await update.message.reply_text(
                 "El valor ingresado no es un número válido. Por favor, ingresa solo números:",
                 reply_markup=Keyboards.get_cancel_keyboard()
             )
@@ -218,7 +218,7 @@ async def get_expense_amount(update: Update, context: ContextTypes.DEFAULT_TYPE)
         print(f"Error en get_expense_amount: {str(e)}")
         traceback.print_exc()
         await send_error(update, context, "Ocurrió un error al procesar el monto del gasto.")
-            return ConversationHandler.END
+        return ConversationHandler.END
 
 async def show_expense_division_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -269,7 +269,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
         
         # Verificar si el usuario quiere cancelar la operación
         if selection == "❌ Cancelar":
-            await update.message.reply_text(
+                await update.message.reply_text(
                 Messages.CANCEL_OPERATION,
                 reply_markup=Keyboards.get_main_menu_keyboard()
             )
@@ -336,7 +336,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                 "🔹 Tú siempre estás incluido automáticamente en el gasto\n\n"
                 "Cuando termines, presiona \"✓ Continuar\""
             )
-            await update.message.reply_text(
+                await update.message.reply_text(
                 message,
                 reply_markup=Keyboards.get_select_members_keyboard(filtered_members, selected_members)
             )
@@ -407,7 +407,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                 if members_status != 200 or not members:
                     await update.message.reply_text(
                         "No se pudo obtener la lista de miembros de la familia. Por favor, intenta nuevamente.",
-                reply_markup=Keyboards.get_main_menu_keyboard()
+                        reply_markup=Keyboards.get_main_menu_keyboard()
                     )
                     return ConversationHandler.END
                 
@@ -426,7 +426,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             context.user_data["expense_data"] = expense_data
             
             # Mostrar el teclado actualizado
-            await update.message.reply_text(
+                await update.message.reply_text(
                 "Se han seleccionado todos los miembros. Presiona \"✓ Continuar\" cuando estés listo.",
                 reply_markup=Keyboards.get_select_members_keyboard(filtered_members, selected_members)
             )
@@ -446,8 +446,8 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
                         "No se pudo obtener la lista de miembros de la familia. Por favor, intenta nuevamente.",
                         reply_markup=Keyboards.get_main_menu_keyboard()
                     )
-            return ConversationHandler.END
-        
+                    return ConversationHandler.END
+                
                 context.user_data["family_members"] = members
             else:
                 members = context.user_data["family_members"]
@@ -460,7 +460,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             context.user_data["expense_data"] = expense_data
             
             # Mostrar el teclado actualizado
-            await update.message.reply_text(
+                await update.message.reply_text(
                 "Se han deseleccionado todos los miembros. El gasto será solo para ti a menos que selecciones a otros miembros.",
                 reply_markup=Keyboards.get_select_members_keyboard(filtered_members, [])
             )
@@ -487,7 +487,7 @@ async def select_members_for_expense(update: Update, context: ContextTypes.DEFAU
             
         # Si la respuesta no es reconocida, pedir que seleccione una opción válida
         else:
-            await update.message.reply_text(
+                await update.message.reply_text(
                 "Por favor, selecciona una opción válida.",
                 reply_markup=Keyboards.get_expense_division_keyboard()
             )
@@ -596,7 +596,7 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if status_code != 200 or not member or not member.get("family_id"):
             # Si el usuario no está en una familia, mostrar error
-            await update.message.reply_text(
+                await update.message.reply_text(
                 Messages.ERROR_NOT_IN_FAMILY,
                 reply_markup=Keyboards.remove_keyboard()
             )
@@ -650,7 +650,7 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         # Verificar si la familia tiene gastos registrados
         if not expenses or len(expenses) == 0:
-            await update.message.reply_text(
+                await update.message.reply_text(
                 Messages.NO_EXPENSES,
                 parse_mode="Markdown"
             )
@@ -973,7 +973,7 @@ async def confirm_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # Limpiar los datos del gasto del contexto
                 if "expense_data" in context.user_data:
-                    del context.user_data["expense_data"]`
+                    del context.user_data["expense_data"]
             
                 # Finalizar conversación
                 return ConversationHandler.END
