@@ -21,7 +21,7 @@ from config import (
     PAYMENT_CONFIRM,
     logger
 )
-from utils.error_handler import send_error
+from utils.helpers import send_error
 
 # Eliminamos la importación circular
 # from handlers.menu_handler import show_main_menu
