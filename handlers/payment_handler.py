@@ -1,22 +1,27 @@
 """
-Payment Handler Module
+Módulo para manejar la funcionalidad de pagos entre miembros.
 
-This module handles all payment-related operations in the bot, including
-registering payments between family members, confirming payments, and
-managing payment data throughout the conversation flow.
+Este módulo contiene las funciones para registrar pagos entre miembros de una familia,
+seleccionar montos, destinatarios y confirmar transacciones.
 """
 
-from telegram import Update, ReplyKeyboardMarkup
+import re
+import traceback
+from typing import Dict, List, Tuple, Any
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, ConversationHandler
-from config import SELECT_TO_MEMBER, PAYMENT_AMOUNT, PAYMENT_CONFIRM
+from services.payment_service import PaymentService
+from services.member_service import MemberService
+from services.family_service import FamilyService
 from ui.keyboards import Keyboards
 from ui.messages import Messages
-from ui.formatters import Formatters
-from services.payment_service import PaymentService
-from services.family_service import FamilyService
-from services.member_service import MemberService
-from utils.context_manager import ContextManager
-from utils.helpers import send_error
+from config import (
+    SELECT_TO_MEMBER,
+    PAYMENT_AMOUNT,
+    PAYMENT_CONFIRM,
+    logger
+)
+from utils.error_handler import send_error
 
 # Eliminamos la importación circular
 # from handlers.menu_handler import show_main_menu
@@ -634,9 +639,19 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
             if status_code in [200, 201]:
-                # Si el pago se creó exitosamente, mostrar mensaje de éxito
+                # Obtener información sobre el estado del pago
+                payment_status = response_data.get("status", "PENDING")
+                
+                # Mensaje inicial para el usuario que creó el pago
+                success_message = Messages.SUCCESS_PAYMENT_CREATED
+                
+                # Si el pago está en estado PENDING, informar al usuario
+                if payment_status == "PENDING":
+                    success_message += "\n\nEl pago está pendiente de confirmación por el destinatario."
+                
+                # Mostrar mensaje de éxito al usuario que creó el pago
                 await update.message.reply_text(
-                    Messages.SUCCESS_PAYMENT_CREATED,
+                    success_message,
                     parse_mode="Markdown",
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
@@ -731,14 +746,59 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             if isinstance(payment_date, str) and "T" in payment_date:
                                 payment_date = payment_date.split("T")[0].replace("-", "/")
                             
-                            # Crear mensaje de notificación
-                            notification_message = (
-                                f"💰 *¡Has recibido un pago!*\n\n"
-                                f"*De:* {from_member_name}\n"
-                                f"*Monto:* ${amount:.2f}\n"
-                                f"*Fecha:* {payment_date}\n\n"
-                                f"Este pago ha sido registrado y actualizado en tu balance familiar."
-                            )
+                            # Obtener ID del pago creado
+                            payment_id = response_data.get("id")
+                            
+                            # Crear botones para confirmar o rechazar el pago
+                            # Solo mostrar botones si el pago está en estado PENDING
+                            if payment_status == "PENDING" and payment_id:
+                                # Crear teclado inline con botones para confirmar/rechazar
+                                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                                import json
+                                
+                                # Crear datos para los callbacks
+                                confirm_data = json.dumps({
+                                    "type": "payment",
+                                    "action": "confirm",
+                                    "payment_id": payment_id
+                                })
+                                
+                                reject_data = json.dumps({
+                                    "type": "payment",
+                                    "action": "reject",
+                                    "payment_id": payment_id
+                                })
+                                
+                                keyboard = [
+                                    [
+                                        InlineKeyboardButton("✅ Confirmar Pago", callback_data=confirm_data),
+                                        InlineKeyboardButton("❌ Rechazar", callback_data=reject_data)
+                                    ]
+                                ]
+                                
+                                reply_markup = InlineKeyboardMarkup(keyboard)
+                                
+                                # Crear mensaje con solicitud de confirmación
+                                notification_message = (
+                                    f"💰 *¡Has recibido un pago pendiente de confirmación!*\n\n"
+                                    f"*De:* {from_member_name}\n"
+                                    f"*Monto:* ${amount:.2f}\n"
+                                    f"*Fecha:* {payment_date}\n\n"
+                                    f"Este pago requiere tu confirmación para ser aplicado a tu balance. "
+                                    f"Por favor, confirma o rechaza este pago."
+                                )
+                            else:
+                                # Si el pago ya está confirmado, no mostrar botones
+                                reply_markup = None
+                                
+                                # Crear mensaje de notificación estándar
+                                notification_message = (
+                                    f"💰 *¡Has recibido un pago!*\n\n"
+                                    f"*De:* {from_member_name}\n"
+                                    f"*Monto:* ${amount:.2f}\n"
+                                    f"*Fecha:* {payment_date}\n\n"
+                                    f"Este pago ha sido registrado y actualizado en tu balance familiar."
+                                )
                             
                             # Enviar notificación al receptor del pago
                             try:
@@ -756,7 +816,8 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 await context.bot.send_message(
                                     chat_id=to_telegram_id,
                                     text=notification_message,
-                                    parse_mode="Markdown"
+                                    parse_mode="Markdown",
+                                    reply_markup=reply_markup
                                 )
                                 print(f"✅ Notificación enviada exitosamente a {to_member_name} (ID: {to_telegram_id})")
                                 
@@ -805,7 +866,6 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 except Exception as e:
                     print(f"❌ Error general al enviar notificación de pago: {str(e)}")
-                    import traceback
                     traceback.print_exc()
                     await update.message.reply_text(
                         "⚠️ El pago fue registrado correctamente, pero ocurrió un error al notificar al receptor.",
@@ -1058,7 +1118,6 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
         
     except Exception as e:
-        import traceback
         traceback.print_exc()
         await send_error(update, context, f"Error al mostrar los pagos: {str(e)}")
         await _show_menu(update, context)

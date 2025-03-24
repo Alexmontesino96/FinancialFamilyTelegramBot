@@ -85,6 +85,7 @@ from handlers.edit_handler import (
     handle_edit_expense_amount,
     cancel as edit_cancel
 )
+from handlers.callback_handler import payment_callback_handler
 from utils.error_handler import register_error_handlers
 from health_check import start_health_check_server
 
@@ -262,6 +263,9 @@ def main():
         filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación)$"),
         handle_menu_option
     ))
+    
+    # 2.5 Manejador para callbacks de pagos
+    application.add_handler(payment_callback_handler)
     
     # 3. Manejador para texto desconocido (debe ser el último)
     application.add_handler(MessageHandler(

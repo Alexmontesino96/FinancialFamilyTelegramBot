@@ -68,4 +68,64 @@ class PaymentService:
         Returns:
             tuple: (status_code, response)
         """
-        return ApiService.request("DELETE", f"/payments/{payment_id}", check_status=False) 
+        return ApiService.request("DELETE", f"/payments/{payment_id}", check_status=False)
+
+    @staticmethod
+    def get_payment(payment_id, telegram_id=None):
+        """Obtiene un pago específico por su ID.
+        
+        Args:
+            payment_id: ID del pago (UUID como string)
+            telegram_id: ID de Telegram del usuario para autenticación (opcional)
+            
+        Returns:
+            tuple: (status_code, response)
+        """
+        return ApiService.request(
+            "GET", 
+            f"/payments/{payment_id}", 
+            token=telegram_id,
+            check_status=False
+        )
+    
+    @staticmethod
+    def confirm_payment(payment_id, telegram_id=None):
+        """Confirma un pago cambiando su estado a CONFIRM.
+        
+        Args:
+            payment_id: ID del pago (UUID como string)
+            telegram_id: ID de Telegram del usuario para autenticación (opcional)
+            
+        Returns:
+            tuple: (status_code, response)
+        """
+        return ApiService.request(
+            "POST",
+            f"/payments/{payment_id}/confirm",
+            token=telegram_id,
+            check_status=False
+        )
+    
+    @staticmethod
+    def update_payment_status(payment_id, status, telegram_id=None):
+        """Actualiza el estado de un pago.
+        
+        Args:
+            payment_id: ID del pago (UUID como string)
+            status: Nuevo estado del pago (PENDING, CONFIRM, INACTIVE)
+            telegram_id: ID de Telegram del usuario para autenticación (opcional)
+            
+        Returns:
+            tuple: (status_code, response)
+        """
+        data = {
+            "status": status
+        }
+        
+        return ApiService.request(
+            "PATCH",
+            f"/payments/{payment_id}/status",
+            data=data,
+            token=telegram_id,
+            check_status=False
+        ) 
