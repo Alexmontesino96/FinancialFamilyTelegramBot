@@ -24,12 +24,22 @@ class MemberService:
         """Obtiene información de un miembro por su ID.
         
         Args:
-            member_id: ID del miembro
+            member_id: ID del miembro o diccionario con datos del miembro
             token: Token de autenticación (opcional)
             
         Returns:
             tuple: (status_code, response)
         """
+        # Verificar si member_id es un diccionario (objeto completo)
+        if isinstance(member_id, dict):
+            # Extraer el ID del diccionario
+            if "id" in member_id:
+                actual_id = member_id["id"]
+                print(f"Se pasó un objeto miembro completo, extrayendo ID: {actual_id}")
+                member_id = actual_id
+            else:
+                print(f"Se pasó un diccionario sin campo 'id', usando como está: {member_id}")
+        
         print(f"Obteniendo información del miembro con ID: {member_id}")
         
         # Verificar si el ID parece ser un UUID (contiene guiones o letras)
@@ -50,12 +60,22 @@ class MemberService:
         """Obtiene información de un miembro por su UUID.
         
         Args:
-            uuid: UUID del miembro
+            uuid: UUID del miembro o diccionario con datos del miembro
             token: Token de autenticación (opcional)
             
         Returns:
             tuple: (status_code, response)
         """
+        # Verificar si uuid es un diccionario (objeto completo)
+        if isinstance(uuid, dict):
+            # Extraer el ID del diccionario
+            if "id" in uuid:
+                actual_uuid = uuid["id"]
+                print(f"Se pasó un objeto miembro completo a get_member_by_uuid, extrayendo UUID: {actual_uuid}")
+                uuid = actual_uuid
+            else:
+                print(f"Se pasó un diccionario sin campo 'id' a get_member_by_uuid, usando como está: {uuid}")
+                
         print(f"Obteniendo información del miembro con UUID: {uuid}")
         status_code, response = ApiService.request("GET", f"/members/uuid/{uuid}", token=token, check_status=False)
         
