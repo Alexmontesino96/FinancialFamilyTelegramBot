@@ -244,9 +244,6 @@ async def handle_payment_callback(update: Update, context: CallbackContext):
         else:
             await query.answer(f"Acción no reconocida: {action}")
             
-    except json.JSONDecodeError:
-        await query.answer("Error al decodificar datos del callback")
-        logger.error(f"Error al decodificar JSON del callback: {query.data}")
     except Exception as e:
         await query.answer("Ocurrió un error al procesar la acción")
         logger.error(f"Error en handle_payment_callback: {str(e)}", exc_info=True)
@@ -254,5 +251,5 @@ async def handle_payment_callback(update: Update, context: CallbackContext):
 # Crear el manejador de callbacks para pagos
 payment_callback_handler = CallbackQueryHandler(
     handle_payment_callback,
-    pattern=r'^{"type":"payment"'
+    pattern=r'^p:'
 ) 
