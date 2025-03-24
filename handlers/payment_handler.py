@@ -662,9 +662,25 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if "member_names" in context.user_data and str(from_member_id) in context.user_data["member_names"]:
                         from_member_name = context.user_data["member_names"][str(from_member_id)]
                     else:
-                        status_code, from_member_data = MemberService.get_member_by_id(from_member_id)
-                        if status_code == 200 and from_member_data:
-                            from_member_name = from_member_data.get("name", "")
+                        # Verificar si from_member_id es un objeto y extraer el ID real
+                        if isinstance(from_member_id, dict) and "id" in from_member_id:
+                            actual_member_id = from_member_id["id"]
+                            from_member_name = from_member_id.get("name", "")
+                            print(f"from_member_id es un objeto completo, extrayendo id: {actual_member_id}")
+                        else:
+                            actual_member_id = from_member_id
+                            
+                        # Usar el ID real para la consulta API si aún necesitamos el nombre
+                        if not from_member_name:
+                            status_code, from_member_data = MemberService.get_member_by_id(actual_member_id)
+                            if status_code == 200 and from_member_data:
+                                from_member_name = from_member_data.get("name", "")
+                                print(f"Nombre obtenido del API: {from_member_name}")
+                    
+                    # Si aún no tenemos un nombre, usar un valor por defecto
+                    if not from_member_name:
+                        from_member_name = "Usuario"
+                        print("No se pudo obtener el nombre del remitente, usando valor por defecto")
                     
                     # Obtener información del destinatario para enviar la notificación
                     print(f"Obteniendo datos del miembro receptor con ID: {to_member_id}")
@@ -691,14 +707,26 @@ async def confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if not to_telegram_id:
                         print(f"Consultando API para obtener información del receptor con ID: {to_member_id}")
                         token = context.user_data.get("token")
-                        status_code, member_response = MemberService.get_member_by_id(to_member_id, token)
-                        print(f"Respuesta de API: status_code={status_code}, data={member_response}")
                         
-                        if status_code == 200 and member_response:
-                            to_member_data = member_response
-                            to_telegram_id = member_response.get("telegram_id")
-                            to_member_name = member_response.get("name", to_member_name)
-                            print(f"Información obtenida de API: {to_member_name}, ID: {to_telegram_id}")
+                        # Verificar si to_member_id es un objeto y extraer el ID real
+                        if isinstance(to_member_id, dict) and "id" in to_member_id:
+                            actual_to_id = to_member_id["id"]
+                            to_member_name = to_member_id.get("name", "")
+                            to_telegram_id = to_member_id.get("telegram_id")
+                            print(f"to_member_id es un objeto completo, extrayendo id: {actual_to_id}")
+                        else:
+                            actual_to_id = to_member_id
+                        
+                        # Solo consultar API si necesitamos más datos
+                        if not to_telegram_id or not to_member_name:
+                            status_code, member_response = MemberService.get_member_by_id(actual_to_id, token)
+                            print(f"Respuesta de API: status_code={status_code}, data={member_response}")
+                            
+                            if status_code == 200 and member_response:
+                                to_member_data = member_response
+                                to_telegram_id = member_response.get("telegram_id")
+                                to_member_name = member_response.get("name", to_member_name)
+                                print(f"Información obtenida de API: {to_member_name}, ID: {to_telegram_id}")
                     
                     # ESTRATEGIA 4: Si no lo encontramos, obtener todos los miembros de la familia
                     if not to_telegram_id and family_id:
