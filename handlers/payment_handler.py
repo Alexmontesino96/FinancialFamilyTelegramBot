@@ -1090,11 +1090,35 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Obtener información del miembro que realiza el pago
             from_id = from_member.get("id") if isinstance(from_member, dict) else from_member
-            from_name = from_member.get("name") if isinstance(from_member, dict) else member_names.get(str(from_id), f"Usuario {from_id}")
+            
+            # Intentar obtener el nombre de diferentes formas
+            from_name = None
+            if isinstance(from_member, dict) and "name" in from_member:
+                from_name = from_member.get("name")
+            elif str(from_id) in member_names:
+                from_name = member_names[str(from_id)]
+            elif from_id in member_names:
+                from_name = member_names[from_id]
+            
+            # Si aún no tenemos nombre, usar un valor por defecto
+            if not from_name:
+                from_name = f"Usuario {from_id}"
             
             # Obtener información del miembro que recibe el pago
             to_id = to_member.get("id") if isinstance(to_member, dict) else to_member
-            to_name = to_member.get("name") if isinstance(to_member, dict) else member_names.get(str(to_id), f"Usuario {to_id}")
+            
+            # Intentar obtener el nombre de diferentes formas
+            to_name = None
+            if isinstance(to_member, dict) and "name" in to_member:
+                to_name = to_member.get("name")
+            elif str(to_id) in member_names:
+                to_name = member_names[str(to_id)]
+            elif to_id in member_names:
+                to_name = member_names[to_id]
+            
+            # Si aún no tenemos nombre, usar un valor por defecto
+            if not to_name:
+                to_name = f"Usuario {to_id}"
             
             amount = payment.get("amount", 0)
             date = payment.get("created_at", "Fecha desconocida")
@@ -1170,4 +1194,4 @@ async def update_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     except Exception as e:
         await send_error(update, context, f"Error al actualizar el teclado: {str(e)}")
-        return ConversationHandler.END 
+        return ConversationHandler.END
