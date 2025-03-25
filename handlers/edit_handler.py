@@ -227,27 +227,30 @@ async def handle_edit_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Create keyboard with payment options
             payment_buttons = []
             for payment in payments[:10]:  # Limit to 10 most recent payments
-                from_member_name = payment.get("from_member_name", "Desconocido")
-                to_member_name = payment.get("to_member_name", "Desconocido")
+                # Obtener los objetos de miembros
+                from_member = payment.get("from_member", {})
+                to_member = payment.get("to_member", {})
+                
+                # Extraer nombres de los objetos de miembros
+                from_member_name = None
+                if isinstance(from_member, dict) and "name" in from_member:
+                    from_member_name = from_member.get("name")
+                
+                to_member_name = None
+                if isinstance(to_member, dict) and "name" in to_member:
+                    to_member_name = to_member.get("name")
+                
+                # Usar ID como respaldo si no se encontró el nombre
+                if not from_member_name:
+                    from_id = from_member.get("id") if isinstance(from_member, dict) else from_member
+                    from_member_name = f"Usuario {from_id}"
+                
+                if not to_member_name:
+                    to_id = to_member.get("id") if isinstance(to_member, dict) else to_member
+                    to_member_name = f"Usuario {to_id}"
+                
                 amount = payment.get("amount", 0)
                 payment_id = payment.get("id")
-                
-                # Notificar al desarrollador si algún nombre es desconocido
-                if from_member_name == "Desconocido":
-                    await notify_unknown_username(
-                        update, 
-                        context, 
-                        payment.get("from_member", {}).get("id", "ID no disponible"), 
-                        f"edit_handler.py - handle_edit_option - payment list (from_member)"
-                    )
-                
-                if to_member_name == "Desconocido":
-                    await notify_unknown_username(
-                        update, 
-                        context, 
-                        payment.get("to_member", {}).get("id", "ID no disponible"), 
-                        f"edit_handler.py - handle_edit_option - payment list (to_member)"
-                    )
                 
                 # Format the button text
                 button_text = f"{from_member_name} → {to_member_name} - ${amount:.2f}"
@@ -559,64 +562,34 @@ async def handle_select_payment(update: Update, context: ContextTypes.DEFAULT_TY
         
         if option == "🗑️ Eliminar Pagos":
             # For deleting, ask for confirmation
-            # Obtener los IDs de los miembros
+            # Obtener los objetos de miembros
             from_member = selected_payment.get("from_member", {})
             to_member = selected_payment.get("to_member", {})
             
-            # Obtener el ID del miembro que realiza el pago
-            from_id = from_member.get("id") if isinstance(from_member, dict) else from_member
-            
-            # Obtener el ID del miembro que recibe el pago
-            to_id = to_member.get("id") if isinstance(to_member, dict) else to_member
-            
-            # Cargar los nombres de los miembros si no están en el contexto
-            member_names = context.user_data.get("member_names", {})
-            if not member_names:
-                # Cargar los nombres de los miembros desde la API
-                family_id = context.user_data.get("family_id")
-                telegram_id = str(update.effective_user.id)
-                status_code, family = FamilyService.get_family(family_id, telegram_id)
-                if status_code == 200 and family and "members" in family:
-                    # Crear un diccionario para mapear IDs a nombres de miembros
-                    for member in family.get("members", []):
-                        member_id = member.get("id")
-                        member_name = member.get("name", f"Usuario {member_id}")
-                        # Guardar tanto como string como de forma numérica si corresponde
-                        member_names[str(member_id)] = member_name
-                        if isinstance(member_id, (int, float)) or (isinstance(member_id, str) and member_id.isdigit()):
-                            member_names[int(member_id) if isinstance(member_id, str) else member_id] = member_name
-                    
-                    # Guardar en el contexto para uso futuro
-                    context.user_data["member_names"] = member_names
-            
-            # Intentar obtener el nombre del miembro que realiza el pago
-            from_name = None
+            # Extraer nombres de los objetos de miembros
+            from_member_name = None
             if isinstance(from_member, dict) and "name" in from_member:
-                from_name = from_member.get("name")
-            elif str(from_id) in member_names:
-                from_name = member_names[str(from_id)]
-            elif from_id in member_names:
-                from_name = member_names[from_id]
-            else:
-                from_name = selected_payment.get("from_member_name", f"Usuario {from_id}")
+                from_member_name = from_member.get("name")
             
-            # Intentar obtener el nombre del miembro que recibe el pago
-            to_name = None
+            to_member_name = None
             if isinstance(to_member, dict) and "name" in to_member:
-                to_name = to_member.get("name")
-            elif str(to_id) in member_names:
-                to_name = member_names[str(to_id)]
-            elif to_id in member_names:
-                to_name = member_names[to_id]
-            else:
-                to_name = selected_payment.get("to_member_name", f"Usuario {to_id}")
+                to_member_name = to_member.get("name")
+            
+            # Usar ID como respaldo si no se encontró el nombre
+            if not from_member_name:
+                from_id = from_member.get("id") if isinstance(from_member, dict) else from_member
+                from_member_name = f"Usuario {from_id}"
+            
+            if not to_member_name:
+                to_id = to_member.get("id") if isinstance(to_member, dict) else to_member
+                to_member_name = f"Usuario {to_id}"
             
             amount = selected_payment.get("amount", 0)
             
             await update.message.reply_text(
                 Messages.CONFIRM_DELETE_PAYMENT.format(
-                    details=f"*De:* {from_name}\n"
-                           f"*Para:* {to_name}\n"
+                    details=f"*De:* {from_member_name}\n"
+                           f"*Para:* {to_member_name}\n"
                            f"*Monto:* ${amount:.2f}"
                 ),
                 parse_mode="Markdown",
