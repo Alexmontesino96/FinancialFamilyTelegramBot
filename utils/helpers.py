@@ -80,3 +80,64 @@ def parse_deep_link(args):
         return "join", arg.replace("join", "")
     
     return None, None 
+
+async def notify_unknown_username(update: Update, context: ContextTypes.DEFAULT_TYPE, member_id: str, location: str):
+    """
+    Notifies the developer about an unknown username.
+    
+    This function sends a notification when a username is unknown (displayed as 'Desconocido'),
+    which helps identify issues with user data retrieval in the application.
+    
+    Args:
+        update (Update): Telegram Update object
+        context (ContextTypes.DEFAULT_TYPE): Telegram context
+        member_id (str): ID of the member with unknown username
+        location (str): Location in the code where the unknown username was detected
+    """
+    import os
+    import html
+    from telegram.constants import ParseMode
+    from config import logger
+    
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "sin username"
+    
+    # Crear el mensaje de notificación
+    notification = f"⚠️ Usuario desconocido detectado:\n"
+    notification += f"- Member ID: {member_id}\n"
+    notification += f"- Ubicación: {location}\n"
+    notification += f"- Reportado por: {user_id} (@{username})"
+    
+    # Registrar en el log
+    logger.warning(notification)
+    
+    # Obtener el chat ID del administrador
+    admin_chat_id = os.getenv('ADMIN_CHAT_ID')
+    
+    # Si no hay un ADMIN_CHAT_ID configurado, usar el chat actual
+    if not admin_chat_id and update and hasattr(update, 'effective_chat'):
+        admin_chat_id = str(update.effective_chat.id)
+        logger.info(f"No ADMIN_CHAT_ID configured, using current chat: {admin_chat_id}")
+    
+    # Enviar la notificación al administrador
+    if admin_chat_id:
+        try:
+            # Formatear el mensaje para HTML
+            notification_html = (
+                f"⚠️ <b>Usuario desconocido detectado</b>\n\n"
+                f"<b>Member ID:</b> {html.escape(str(member_id))}\n"
+                f"<b>Ubicación:</b> {html.escape(location)}\n"
+                f"<b>Reportado por:</b> {user_id} (@{html.escape(username)})\n"
+            )
+            
+            # Enviar el mensaje al administrador
+            await context.bot.send_message(
+                chat_id=admin_chat_id,
+                text=notification_html,
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logger.error(f"Failed to send unknown username notification to admin: {e}")
+    else:
+        # Si no hay chat de administrador, imprimir en la consola
+        print(notification)
