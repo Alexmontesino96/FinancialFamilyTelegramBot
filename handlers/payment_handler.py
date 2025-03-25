@@ -1066,24 +1066,59 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_text = Messages.PAYMENTS_LIST_HEADER
         
         # Ordenar pagos por fecha (más recientes primero)
-        from datetime import datetime
+        from datetime import datetime, timedelta
+        
+        # Obtener la fecha actual
+        now = datetime.now()
+        # Calcular la fecha de una semana atrás
+        one_week_ago = now - timedelta(days=7)
         
         # Intentamos ordenar por fecha si está disponible
         try:
+            # Filtrar y ordenar pagos
+            filtered_payments = []
+            for payment in payments:
+                created_at = payment.get("created_at", "")
+                if created_at:
+                    try:
+                        # Convertir la fecha de creación a objeto datetime
+                        payment_date = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                        # Verificar si el pago es de la última semana
+                        if payment_date >= one_week_ago:
+                            filtered_payments.append(payment)
+                    except (ValueError, AttributeError):
+                        # Si hay un error al procesar la fecha, incluir el pago por defecto
+                        filtered_payments.append(payment)
+            
+            # Ordenar los pagos filtrados
             sorted_payments = sorted(
-                payments, 
+                filtered_payments, 
                 key=lambda x: datetime.fromisoformat(x.get("created_at").replace("Z", "+00:00")), 
                 reverse=True
             )
         except (AttributeError, ValueError):
-            # Si hay un error al ordenar, usar la lista original
-            sorted_payments = payments
+            # Si hay un error al ordenar, usar la lista filtrada
+            sorted_payments = filtered_payments if 'filtered_payments' in locals() else payments
         
-        # Limitar a 10 pagos para no hacer el mensaje demasiado largo
-        limited_payments = sorted_payments[:10]
+        # Si no hay pagos después del filtrado, mostrar mensaje
+        if len(sorted_payments) == 0:
+            try:
+                await message.edit_text(
+                    "No hay pagos registrados en la última semana.",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+            except Exception as edit_error:
+                await update.message.reply_text(
+                    "No hay pagos registrados en la última semana.",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+            return ConversationHandler.END
+        
+        # Construir mensaje con la lista de pagos
+        message_text = Messages.PAYMENTS_LIST_HEADER
         
         # Construir el mensaje con los pagos
-        for payment in limited_payments:
+        for payment in sorted_payments:
             # Los miembros ahora son objetos completos, no solo IDs
             from_member = payment.get("from_member", {})
             to_member = payment.get("to_member", {})
@@ -1139,9 +1174,8 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 date=formatted_date
             )
         
-        # Si hay más pagos de los que mostramos, añadir un mensaje indicándolo
-        if len(sorted_payments) > 10:
-            message_text += f"\n_Mostrando los 10 pagos más recientes de {len(sorted_payments)} en total._"
+        # Añadir mensaje con el total de pagos encontrados
+        message_text += f"\n_Mostrando {len(sorted_payments)} pagos de la última semana._"
         
         # Mostrar el mensaje con la lista de pagos
         try:
