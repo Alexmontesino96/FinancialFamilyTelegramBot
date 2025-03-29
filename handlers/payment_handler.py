@@ -1067,9 +1067,10 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Ordenar pagos por fecha (más recientes primero)
         from datetime import datetime, timedelta
+        import pytz
         
-        # Obtener la fecha actual
-        now = datetime.now()
+        # Obtener la fecha actual con zona horaria
+        now = datetime.now(pytz.UTC)
         # Calcular la fecha de una semana atrás
         one_week_ago = now - timedelta(days=7)
         
@@ -1081,7 +1082,7 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 created_at = payment.get("created_at", "")
                 if created_at:
                     try:
-                        # Convertir la fecha de creación a objeto datetime
+                        # Convertir la fecha de creación a objeto datetime con zona horaria
                         payment_date = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
                         # Verificar si el pago es de la última semana
                         if payment_date >= one_week_ago:
