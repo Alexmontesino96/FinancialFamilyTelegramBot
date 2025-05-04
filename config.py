@@ -23,10 +23,10 @@ logger = logging.getLogger(__name__)
 IS_DOCKER = os.environ.get('DOCKER', 'false').lower() == 'true'
 IS_RENDER = os.environ.get('RENDER', 'false').lower() == 'true'
 
-# Bot token from environment variables
-BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+# Bot token from environment variables - check for both variable names for compatibility
+BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN') or os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN and not IS_RENDER:
-    logger.error("TELEGRAM_BOT_TOKEN environment variable not set!")
+    logger.error("Neither TELEGRAM_BOT_TOKEN nor BOT_TOKEN environment variable is set!")
     sys.exit(1)
 else:
     logger.info("Bot token loaded successfully")
