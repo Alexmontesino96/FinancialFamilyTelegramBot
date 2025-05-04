@@ -31,8 +31,8 @@ if not BOT_TOKEN and not IS_RENDER:
 else:
     logger.info("Bot token loaded successfully")
 
-# API base URL from environment variables, with fallback to localhost for development
-API_BASE_URL = os.environ.get('API_BASE_URL', 'http://localhost:8000')
+# API base URL from environment variables, with multiple fallbacks for compatibility
+API_BASE_URL = os.environ.get('API_BASE_URL_RENDER', 'http://localhost:8000')
 logger.info(f"Using API base URL: {API_BASE_URL}")
 
 # Conversation states
