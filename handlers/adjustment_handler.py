@@ -35,6 +35,7 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         # Obtener el ID de Telegram del usuario
         telegram_id = str(update.effective_user.id)
+        print(f"[AJUSTE_DEUDAS] ID de Telegram del usuario: {telegram_id}")
         
         # Enviar mensaje de carga
         message = await update.message.reply_text(
@@ -62,8 +63,12 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
             
             family_id = context.user_data.get("family_id")
         
+        print(f"[AJUSTE_DEUDAS] ID de familia: {family_id}")
+        
         # Obtener información del miembro actual
         status_code, member = MemberService.get_member(telegram_id)
+        print(f"[AJUSTE_DEUDAS] Respuesta get_member: status={status_code}, member={member}")
+        
         if status_code != 200 or not member:
             try:
                 await message.edit_text(
@@ -80,6 +85,7 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
         
         member_id = member.get("id")
         member_name = member.get("name")
+        print(f"[AJUSTE_DEUDAS] ID de miembro: {member_id}, Nombre: {member_name}")
         
         # Inicializar datos de ajuste en el contexto
         context.user_data["adjustment_data"] = {
@@ -89,6 +95,7 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
         
         # Obtener los balances de la familia
         status_code, balances = FamilyService.get_family_balances(family_id, telegram_id)
+        print(f"[AJUSTE_DEUDAS] Respuesta get_family_balances: status={status_code}, balances={balances}")
         
         if status_code != 200 or not balances:
             try:
@@ -107,23 +114,72 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
         # Filtrar los créditos (balances donde otros miembros deben al usuario actual)
         credits = []
         
+        print(f"[AJUSTE_DEUDAS] Buscando créditos para el miembro con ID: {member_id}")
+        
+        # Verificar la estructura de los balances para depuración
+        print(f"[AJUSTE_DEUDAS] Tipo de balances: {type(balances)}")
+        print(f"[AJUSTE_DEUDAS] Longitud de balances: {len(balances) if isinstance(balances, list) else 'No es una lista'}")
+        if isinstance(balances, list) and len(balances) > 0:
+            print(f"[AJUSTE_DEUDAS] Estructura del primer balance: {balances[0].keys() if isinstance(balances[0], dict) else 'No es un diccionario'}")
+        
+        # Recorrer los balances y buscar créditos
         for balance in balances:
+            # Imprimir todo el balance para depuración
+            print(f"[AJUSTE_DEUDAS] Balance completo: {balance}")
+            
+            # Intentar el formato estándar
             from_member = balance.get("from_member", {})
             to_member = balance.get("to_member", {})
             amount = balance.get("amount", 0)
+            
+            print(f"[AJUSTE_DEUDAS] Verificando balance: from={from_member.get('id')}, to={to_member.get('id')}, amount={amount}")
+            
+            # Información adicional de verificación
+            print(f"[AJUSTE_DEUDAS] ¿Es el usuario el acreedor? {to_member.get('id') == member_id}")
+            print(f"[AJUSTE_DEUDAS] ¿El monto es positivo? {amount > 0}")
             
             # Si el usuario actual es el acreedor (to_member) y el monto es positivo
             if to_member.get("id") == member_id and amount > 0:
                 from_member_id = from_member.get("id")
                 from_member_name = from_member.get("name", f"Usuario {from_member_id}")
                 
+                print(f"[AJUSTE_DEUDAS] Crédito encontrado: {from_member_name} debe {amount} a {member_name}")
                 credits.append((from_member_name, from_member_id, amount))
+            
+            # Intentar formato alternativo si hay un campo "member_id" y "credits"
+            if not from_member and not to_member and "member_id" in balance:
+                # Posible formato alternativo con estructura diferente
+                print(f"[AJUSTE_DEUDAS] Detectado formato alternativo de balance")
+                
+                if str(balance.get("member_id")) == str(member_id) and "credits" in balance:
+                    print(f"[AJUSTE_DEUDAS] Encontrados créditos en formato alternativo para el miembro {member_id}")
+                    
+                    for credit in balance.get("credits", []):
+                        from_id = credit.get("from")
+                        amount = credit.get("amount", 0)
+                        
+                        # Buscar el nombre del miembro deudor
+                        from_name = None
+                        if "family" in context.user_data and "members" in context.user_data["family"]:
+                            for m in context.user_data["family"]["members"]:
+                                if str(m.get("id")) == str(from_id):
+                                    from_name = m.get("name")
+                                    break
+                        
+                        if not from_name:
+                            from_name = f"Usuario {from_id}"
+                        
+                        if amount > 0:
+                            print(f"[AJUSTE_DEUDAS] Crédito alternativo encontrado: {from_name} debe {amount} a {member_name}")
+                            credits.append((from_name, from_id, amount))
         
         # Guardar los créditos en el contexto
         context.user_data["adjustment_data"]["credits"] = credits
+        print(f"[AJUSTE_DEUDAS] Total de créditos encontrados: {len(credits)}")
         
         # Si no hay créditos, mostrar mensaje y terminar
         if not credits:
+            print(f"[AJUSTE_DEUDAS] No se encontraron créditos para el usuario")
             try:
                 await message.edit_text(
                     Messages.NO_CREDITS,
@@ -138,6 +194,7 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
             return ConversationHandler.END
         
         # Mostrar los créditos para seleccionar
+        print(f"[AJUSTE_DEUDAS] Mostrando {len(credits)} créditos al usuario")
         try:
             await message.edit_text(
                 Messages.DEBT_ADJUSTMENT_INTRO + "\n\n" + Messages.SELECT_CREDIT,
