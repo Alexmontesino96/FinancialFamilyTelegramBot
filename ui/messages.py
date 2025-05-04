@@ -167,4 +167,14 @@ class Messages:
         "2. Se abrirá el bot\n"
         "3. Presiona el botón 'INICIAR' o envía /start\n"
         "4. Serás añadido automáticamente a la familia"
-    ) 
+    )
+    
+    # Mensajes para ajuste de deudas
+    DEBT_ADJUSTMENT_INTRO = "💱 *Ajuste de Deudas*\n\nAquí puedes reducir la deuda que otros miembros tienen contigo, sin registrar un pago real."
+    NO_CREDITS = "✅ En este momento no tienes créditos pendientes con ningún miembro de tu familia."
+    SELECT_CREDIT = "💱 Selecciona el crédito que deseas ajustar:"
+    ADJUSTMENT_AMOUNT_PROMPT = "💱 *{debtor_name}* te debe *${total_amount:.2f}*\n\n¿Qué cantidad deseas ajustar de esta deuda?"
+    ADJUSTMENT_AMOUNT_TOO_HIGH = "❌ El monto ingresado (${amount:.2f}) excede la deuda total (${total:.2f}). Por favor, ingresa un monto menor o igual a la deuda."
+    ADJUSTMENT_CONFIRM = "📝 Resumen del ajuste de deuda:\n\n*Deudor:* {debtor_name}\n*Acreedor:* {creditor_name}\n*Monto a ajustar:* ${amount:.2f}\n\n¿Confirmas este ajuste? La deuda se reducirá permanentemente."
+    ADJUSTMENT_SUCCESS = "✅ ¡Ajuste de deuda registrado con éxito! La deuda ha sido reducida."
+    INVALID_ADJUSTMENT_AMOUNT = "❌ Monto no válido. Por favor, ingresa un número positivo." 

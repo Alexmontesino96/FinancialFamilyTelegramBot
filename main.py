@@ -34,6 +34,9 @@ from config import (
     CONFIRM_DELETE,
     EDIT_EXPENSE_AMOUNT,
     LIST_OPTION,
+    SELECT_CREDIT,
+    ADJUSTMENT_AMOUNT,
+    ADJUSTMENT_CONFIRM,
     logger
 )
 from handlers.start_handler import (
@@ -84,6 +87,13 @@ from handlers.edit_handler import (
     handle_confirm_delete,
     handle_edit_expense_amount,
     cancel as edit_cancel
+)
+from handlers.adjustment_handler import (
+    start_debt_adjustment,
+    handle_credit_selection,
+    handle_adjustment_amount,
+    handle_adjustment_confirmation,
+    cancel as adjustment_cancel
 )
 from handlers.callback_handler import payment_callback_handler
 from utils.error_handler import register_error_handlers
@@ -234,6 +244,22 @@ def main():
         persistent=False
     )
     
+    adjustment_conv_handler = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.Regex("^💱 Ajustar Deudas$"), start_debt_adjustment)
+        ],
+        states={
+            SELECT_CREDIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_credit_selection)],
+            ADJUSTMENT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_adjustment_amount)],
+            ADJUSTMENT_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_adjustment_confirmation)]
+        },
+        fallbacks=[
+            CommandHandler("cancel", adjustment_cancel)
+        ],
+        name="adjustment_conversation",
+        persistent=False
+    )
+    
     list_conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^📜 Listar Registros$"), show_list_options)
@@ -256,11 +282,12 @@ def main():
     application.add_handler(edit_conv_handler)
     application.add_handler(expense_conv_handler)
     application.add_handler(payment_conv_handler)
+    application.add_handler(adjustment_conv_handler)
     application.add_handler(list_conv_handler)
     
     # 2. Manejador para opciones específicas del menú principal
     application.add_handler(MessageHandler(
-        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación)$"),
+        filters.Regex("^(💰 Ver Balances|ℹ️ Info Familia|📋 Ver Gastos|📊 Ver Pagos|🔗 Compartir Invitación|💱 Ajustar Deudas)$"),
         handle_menu_option
     ))
     

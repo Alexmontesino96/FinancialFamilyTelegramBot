@@ -128,4 +128,44 @@ class PaymentService:
             data=data,
             token=telegram_id,
             check_status=False
+        )
+    
+    @staticmethod
+    def create_debt_adjustment(from_member, to_member, amount, telegram_id=None):
+        """
+        Crea un ajuste de deuda entre dos miembros.
+        
+        Un ajuste de deuda permite reducir parcialmente la deuda que un miembro
+        tiene hacia otro, sin involucrar un pago real.
+        
+        Args:
+            from_member (str): ID del miembro deudor
+            to_member (str): ID del miembro acreedor
+            amount (float): Monto del ajuste
+            telegram_id (str, optional): ID de Telegram para autenticación
+            
+        Returns:
+            tuple: (status_code, response_data)
+        """
+        # Asegurarse de que los valores sean del tipo correcto
+        from_member_str = str(from_member) if from_member is not None else None
+        to_member_str = str(to_member) if to_member is not None else None
+        amount_float = float(amount) if amount is not None else None
+        
+        # Datos para la solicitud
+        data = {
+            "from_member": from_member_str,
+            "to_member": to_member_str,
+            "amount": amount_float
+        }
+        
+        print(f"Datos de solicitud de ajuste de deuda: {data}")
+        
+        # Usar el endpoint para ajuste de deuda
+        return ApiService.request(
+            method="POST",
+            endpoint="/payments/debt-adjustment",
+            data=data,
+            token=telegram_id,
+            check_status=False
         ) 

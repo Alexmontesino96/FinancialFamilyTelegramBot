@@ -10,7 +10,7 @@ class Keyboards:
             ["💰 Ver Balances", "💸 Crear Gasto"],
             ["📜 Listar Registros", "💳 Registrar Pago"],
             ["✏️ Editar/Eliminar", "ℹ️ Info Familia"],
-            ["🔗 Compartir Invitación"]
+            ["🔗 Compartir Invitación", "💱 Ajustar Deudas"]
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     
@@ -98,4 +98,24 @@ class Keyboards:
         keyboard.append(["✓ Continuar"])
         keyboard.append(["❌ Cancelar"])
         
-        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False) 
+        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+        
+    @staticmethod
+    def get_credits_keyboard(credits):
+        """
+        Genera un teclado con opciones de créditos pendientes.
+        
+        Args:
+            credits (list): Lista de créditos pendientes con formato [(member_name, member_id, amount)]
+            
+        Returns:
+            ReplyKeyboardMarkup: Teclado con opciones de créditos
+        """
+        keyboard = []
+        for credit in credits:
+            member_name, amount = credit[0], credit[2]
+            keyboard.append([f"{member_name} - ${amount:.2f}"])
+        
+        keyboard.append(["❌ Cancelar"])
+        
+        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True) 

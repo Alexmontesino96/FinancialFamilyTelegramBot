@@ -1,78 +1,72 @@
 """
-Configuration Module
+Configuration Module for the Financial Bot
 
-This module loads environment variables from .env file and defines
-conversation states used throughout the application.
+This module contains configuration constants and environment variables used throughout the application.
 """
 
 import os
-from dotenv import load_dotenv
 import logging
+import sys
+from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env file if it exists
 load_dotenv()
 
-# Configure logging
+# Set up logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO if os.getenv('DEBUG', 'False').lower() != 'true' else logging.DEBUG
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Bot configuration
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-if not BOT_TOKEN:
-    logger.error("BOT_TOKEN not found in environment variables!")
-    raise ValueError("BOT_TOKEN environment variable is required")
+# Check if we're running inside Docker or on Render 
+IS_DOCKER = os.environ.get('DOCKER', 'false').lower() == 'true'
+IS_RENDER = os.environ.get('RENDER', 'false').lower() == 'true'
 
-# API configuration
-API_BASE_URL = os.getenv('API_BASE_URL_RENDER')
-
-# Verificar que API_BASE_URL tenga un valor válido
-if not API_BASE_URL:
-    # Intentar con la variable alternativa por compatibilidad
-    API_BASE_URL = os.getenv('API_BASE_URL')
-    
-    # Si aún no hay valor, usar un valor predeterminado
-    if not API_BASE_URL:
-        API_BASE_URL = "https://financialfamilyapi.onrender.com"
-        logger.warning(f"No se encontró API_BASE_URL en variables de entorno. Usando valor por defecto: {API_BASE_URL}")
-    else:
-        logger.info(f"Usando API_BASE_URL: {API_BASE_URL}")
+# Bot token from environment variables
+BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+if not BOT_TOKEN and not IS_RENDER:
+    logger.error("TELEGRAM_BOT_TOKEN environment variable not set!")
+    sys.exit(1)
 else:
-    logger.info(f"Usando API_BASE_URL_RENDER: {API_BASE_URL}")
+    logger.info("Bot token loaded successfully")
 
-# Conversation states for different flows
-# Start flow - Family creation and joining
-ASK_FAMILY_CODE = 0  # State for asking if user wants to create or join a family
-ASK_FAMILY_NAME = 1  # State for asking the family name when creating
-ASK_USER_NAME = 2    # State for asking the user's name
-JOIN_FAMILY_CODE = 3 # State for asking the family code when joining
+# API base URL from environment variables, with fallback to localhost for development
+API_BASE_URL = os.environ.get('API_BASE_URL', 'http://localhost:8000')
+logger.info(f"Using API base URL: {API_BASE_URL}")
 
-# Expense flow - Creating and managing expenses
-DESCRIPTION = 4      # State for asking expense description
-AMOUNT = 5           # State for asking expense amount
-SELECT_MEMBERS = 16   # State for selecting members to split the expense with
-CONFIRM = 6          # State for confirming expense creation
+# Conversation states
+# For family creation/joining
+ASK_FAMILY_CODE = 1
+ASK_FAMILY_NAME = 2
+ASK_USER_NAME = 3
+JOIN_FAMILY_CODE = 4
 
-# Payment flow - Registering payments between members
-SELECT_TO_MEMBER = 7  # State for selecting the member to pay
-PAYMENT_AMOUNT = 8    # State for entering payment amount
-PAYMENT_CONFIRM = 9   # State for confirming payment
+# For expense creation
+DESCRIPTION = 10
+AMOUNT = 11
+SELECT_MEMBERS = 12  # For expense division
+CONFIRM = 13
 
-# Edit/Delete flow - Modifying or removing records
-EDIT_OPTION = 10      # State for selecting edit option (expense or payment)
-SELECT_EXPENSE = 11   # State for selecting which expense to edit/delete
-SELECT_PAYMENT = 12   # State for selecting which payment to edit/delete
-CONFIRM_DELETE = 13   # State for confirming deletion
-EDIT_EXPENSE_AMOUNT = 14  # State for editing expense amount
+# For payment creation
+SELECT_TO_MEMBER = 20
+PAYMENT_AMOUNT = 21
+PAYMENT_CONFIRM = 22
 
-# List flow - Listing records
-LIST_OPTION = 15      # State for selecting what to list (expenses or payments)
+# For editing/deleting
+EDIT_OPTION = 30
+SELECT_EXPENSE = 31
+SELECT_PAYMENT = 32
+CONFIRM_DELETE = 33
+EDIT_EXPENSE_AMOUNT = 34
 
-# Edit/Delete flow - Modifying or removing records
-EDIT_OPTION = 10      # State for selecting edit option (expense or payment)
-SELECT_EXPENSE = 11   # State for selecting which expense to edit/delete
-SELECT_PAYMENT = 12   # State for selecting which payment to edit/delete
-CONFIRM_DELETE = 13   # State for confirming deletion
-EDIT_EXPENSE_AMOUNT = 14  # State for editing expense amount 
+# For listing options
+LIST_OPTION = 40
+
+# For debt adjustment
+SELECT_CREDIT = 50
+ADJUSTMENT_AMOUNT = 51
+ADJUSTMENT_CONFIRM = 52
+
+# Other configuration
+MAX_MESSAGE_LENGTH = 4096  # Maximum message length for Telegram messages 

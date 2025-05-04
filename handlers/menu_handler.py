@@ -23,6 +23,7 @@ from handlers.expense_handler import crear_gasto, listar_gastos
 from handlers.payment_handler import registrar_pago, listar_pagos
 from handlers.family_handler import show_balances, mostrar_info_familia, compartir_invitacion
 from handlers.edit_handler import show_edit_options
+from handlers.adjustment_handler import start_debt_adjustment
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -273,28 +274,24 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
         family_id = context.user_data["family_id"]
         print(f"Ya tenemos el family_id en el contexto: {family_id}")
     else:
-        # Si no tenemos el ID de familia, verificar que el usuario esté en una familia
+        # Si no tenemos el family_id, intentamos obtenerlo
+        print("No tenemos el family_id en el contexto, intentando obtenerlo")
         telegram_id = str(update.effective_user.id)
-        print(f"Solicitando información del miembro con telegram_id: {telegram_id}")
         
-        # Obtener información del miembro desde la API
-        status_code, member = MemberService.get_member(telegram_id)
+        # Verificar si el usuario está en una familia
+        is_in_family = await ContextManager.check_user_in_family(context, telegram_id)
         
-        # Si el usuario no está en una familia, mostrar error y terminar
-        if status_code != 200 or not member or not member.get("family_id"):
-            await update.message.reply_text(Messages.ERROR_NOT_IN_FAMILY)
+        if not is_in_family:
+            # Si el usuario no está en una familia, mostrar mensaje informativo
+            await update.message.reply_text(
+                Messages.ERROR_NOT_IN_FAMILY,
+                reply_markup=Keyboards.get_main_menu_keyboard()
+            )
             return ConversationHandler.END
         
-        # Guardar el ID de familia en el contexto para futuras consultas
-        family_id = member.get("family_id")
-        context.user_data["family_id"] = family_id
-        print(f"Guardando family_id en el contexto: {family_id}")
-        
-        # También guardar la información de la familia para acceso rápido
-        context.user_data["family"] = member.get("family", {})
-        
-        # Cargar los nombres de los miembros en el contexto para uso futuro
-        await ContextManager.load_family_members(context, family_id)
+        # Ya deberíamos tener el family_id en el contexto
+        family_id = context.user_data.get("family_id")
+        print(f"Family ID obtenido del contexto: {family_id}")
     
     # Procesar la opción seleccionada y redirigir al manejador correspondiente
     if option == "💸 Crear Gasto":
@@ -326,6 +323,9 @@ async def handle_menu_option(update: Update, context: ContextTypes.DEFAULT_TYPE)
     elif option == "✏️ Editar/Eliminar":
         # Mostrar opciones de edición y eliminación
         return await show_edit_options(update, context)
+    elif option == "💱 Ajustar Deudas":
+        # Iniciar el flujo de ajuste de deudas
+        return await start_debt_adjustment(update, context)
     else:
         # Opción no reconocida, mostrar mensaje de error
         await update.message.reply_text(
