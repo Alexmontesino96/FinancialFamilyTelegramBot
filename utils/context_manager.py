@@ -57,7 +57,35 @@ class ContextManager:
                 family_id = response.get("family_id")
                 context.user_data["family_id"] = family_id
                 print(f"ID de familia guardado en el contexto: {family_id}")
+                
+                # También guardamos el ID del miembro para futuras consultas
+                if "id" in response:
+                    context.user_data["member_id"] = response["id"]
+                    print(f"ID del miembro guardado en el contexto: {response['id']}")
+                
+                # Guardar información del miembro completa si está disponible
+                context.user_data["member"] = response
+                
                 return True
+            
+            # Si no lo encontramos, intentar una forma alternativa
+            if status_code != 200 or not response or not response.get("family_id"):
+                print(f"No se encontró familia con el método normal. Código: {status_code}")
+                
+                # Intentar obtener la información del miembro directamente
+                status_code, member = MemberService.get_member(telegram_id)
+                
+                if status_code == 200 and member and member.get("family_id"):
+                    family_id = member.get("family_id")
+                    context.user_data["family_id"] = family_id
+                    print(f"ID de familia encontrado mediante consulta directa: {family_id}")
+                    
+                    # Guardar también el ID del miembro y su información
+                    if "id" in member:
+                        context.user_data["member_id"] = member["id"]
+                    context.user_data["member"] = member
+                    
+                    return True
             
             print("Usuario no está en ninguna familia según la API")
             return False
@@ -65,6 +93,27 @@ class ContextManager:
             # Handle any unexpected errors
             print(f"Error en check_user_in_family: {str(e)}")
             traceback.print_exc()
+            
+            # Último intento: consultar directamente por el telegram_id
+            try:
+                print("Intentando obtener miembro directamente como último recurso")
+                status_code, member = MemberService.get_member(telegram_id)
+                
+                if status_code == 200 and member and member.get("family_id"):
+                    family_id = member.get("family_id")
+                    context.user_data["family_id"] = family_id
+                    print(f"ID de familia obtenido en último intento: {family_id}")
+                    
+                    # Guardar también datos del miembro
+                    if "id" in member:
+                        context.user_data["member_id"] = member["id"]
+                    context.user_data["member"] = member
+                    
+                    return True
+            except Exception as inner_e:
+                print(f"Error en último intento de obtener miembro: {str(inner_e)}")
+                traceback.print_exc()
+            
             return False
     
     @staticmethod
