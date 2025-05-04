@@ -47,10 +47,17 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
         if not family_id:
             is_in_family = await ContextManager.check_user_in_family(context, telegram_id)
             if not is_in_family:
-                await message.edit_text(
-                    Messages.ERROR_NOT_IN_FAMILY,
-                    reply_markup=Keyboards.get_main_menu_keyboard()
-                )
+                try:
+                    await message.edit_text(
+                        Messages.ERROR_NOT_IN_FAMILY,
+                        reply_markup=Keyboards.get_main_menu_keyboard()
+                    )
+                except Exception as edit_error:
+                    print(f"Error al editar mensaje: {str(edit_error)}")
+                    await update.message.reply_text(
+                        Messages.ERROR_NOT_IN_FAMILY,
+                        reply_markup=Keyboards.get_main_menu_keyboard()
+                    )
                 return ConversationHandler.END
             
             family_id = context.user_data.get("family_id")
@@ -58,10 +65,17 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
         # Obtener información del miembro actual
         status_code, member = MemberService.get_member(telegram_id)
         if status_code != 200 or not member:
-            await message.edit_text(
-                Messages.ERROR_MEMBER_NOT_FOUND,
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
+            try:
+                await message.edit_text(
+                    Messages.ERROR_MEMBER_NOT_FOUND,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+            except Exception as edit_error:
+                print(f"Error al editar mensaje: {str(edit_error)}")
+                await update.message.reply_text(
+                    Messages.ERROR_MEMBER_NOT_FOUND,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
             return ConversationHandler.END
         
         member_id = member.get("id")
@@ -77,10 +91,17 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
         status_code, balances = FamilyService.get_family_balances(family_id, telegram_id)
         
         if status_code != 200 or not balances:
-            await message.edit_text(
-                "No se pudieron obtener los balances de la familia.",
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
+            try:
+                await message.edit_text(
+                    "No se pudieron obtener los balances de la familia.",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+            except Exception as edit_error:
+                print(f"Error al editar mensaje: {str(edit_error)}")
+                await update.message.reply_text(
+                    "No se pudieron obtener los balances de la familia.",
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
             return ConversationHandler.END
         
         # Filtrar los créditos (balances donde otros miembros deben al usuario actual)
@@ -103,18 +124,34 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
         
         # Si no hay créditos, mostrar mensaje y terminar
         if not credits:
-            await message.edit_text(
-                Messages.NO_CREDITS,
-                reply_markup=Keyboards.get_main_menu_keyboard()
-            )
+            try:
+                await message.edit_text(
+                    Messages.NO_CREDITS,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
+            except Exception as edit_error:
+                print(f"Error al editar mensaje: {str(edit_error)}")
+                await update.message.reply_text(
+                    Messages.NO_CREDITS,
+                    reply_markup=Keyboards.get_main_menu_keyboard()
+                )
             return ConversationHandler.END
         
         # Mostrar los créditos para seleccionar
-        await message.edit_text(
-            Messages.DEBT_ADJUSTMENT_INTRO + "\n\n" + Messages.SELECT_CREDIT,
-            parse_mode="Markdown",
-            reply_markup=Keyboards.get_credits_keyboard(credits)
-        )
+        try:
+            await message.edit_text(
+                Messages.DEBT_ADJUSTMENT_INTRO + "\n\n" + Messages.SELECT_CREDIT,
+                parse_mode="Markdown",
+                reply_markup=Keyboards.get_credits_keyboard(credits)
+            )
+        except Exception as edit_error:
+            print(f"Error al editar mensaje para mostrar créditos: {str(edit_error)}")
+            # Si no se puede editar, enviar un nuevo mensaje
+            await update.message.reply_text(
+                Messages.DEBT_ADJUSTMENT_INTRO + "\n\n" + Messages.SELECT_CREDIT,
+                parse_mode="Markdown",
+                reply_markup=Keyboards.get_credits_keyboard(credits)
+            )
         
         # Guardar la correspondencia entre botones y créditos
         button_map = {}
