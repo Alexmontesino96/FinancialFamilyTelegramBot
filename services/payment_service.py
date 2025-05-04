@@ -164,7 +164,7 @@ class PaymentService:
         # Usar el endpoint para ajuste de deuda
         return ApiService.request(
             method="POST",
-            endpoint="/payments/debt-adjustment",
+            endpoint="/payments/debt-adjustment/",
             data=data,
             token=telegram_id,
             check_status=False
