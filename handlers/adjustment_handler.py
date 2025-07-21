@@ -115,28 +115,12 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
         credits = []
         
         print(f"[AJUSTE_DEUDAS] Buscando créditos para el miembro con ID: {member_id}")
-        
-        # Verificar la estructura de los balances para depuración
-        print(f"[AJUSTE_DEUDAS] Tipo de balances: {type(balances)}")
-        print(f"[AJUSTE_DEUDAS] Longitud de balances: {len(balances) if isinstance(balances, list) else 'No es una lista'}")
-        if isinstance(balances, list) and len(balances) > 0:
-            print(f"[AJUSTE_DEUDAS] Estructura del primer balance: {balances[0].keys() if isinstance(balances[0], dict) else 'No es un diccionario'}")
-        
-        # Recorrer los balances y buscar créditos
         for balance in balances:
-            # Imprimir todo el balance para depuración
-            print(f"[AJUSTE_DEUDAS] Balance completo: {balance}")
-            
-            # Intentar el formato estándar
             from_member = balance.get("from_member", {})
             to_member = balance.get("to_member", {})
             amount = balance.get("amount", 0)
             
             print(f"[AJUSTE_DEUDAS] Verificando balance: from={from_member.get('id')}, to={to_member.get('id')}, amount={amount}")
-            
-            # Información adicional de verificación
-            print(f"[AJUSTE_DEUDAS] ¿Es el usuario el acreedor? {to_member.get('id') == member_id}")
-            print(f"[AJUSTE_DEUDAS] ¿El monto es positivo? {amount > 0}")
             
             # Si el usuario actual es el acreedor (to_member) y el monto es positivo
             if to_member.get("id") == member_id and amount > 0:
@@ -145,33 +129,6 @@ async def start_debt_adjustment(update: Update, context: ContextTypes.DEFAULT_TY
                 
                 print(f"[AJUSTE_DEUDAS] Crédito encontrado: {from_member_name} debe {amount} a {member_name}")
                 credits.append((from_member_name, from_member_id, amount))
-            
-            # Intentar formato alternativo si hay un campo "member_id" y "credits"
-            if not from_member and not to_member and "member_id" in balance:
-                # Posible formato alternativo con estructura diferente
-                print(f"[AJUSTE_DEUDAS] Detectado formato alternativo de balance")
-                
-                if str(balance.get("member_id")) == str(member_id) and "credits" in balance:
-                    print(f"[AJUSTE_DEUDAS] Encontrados créditos en formato alternativo para el miembro {member_id}")
-                    
-                    for credit in balance.get("credits", []):
-                        from_id = credit.get("from")
-                        amount = credit.get("amount", 0)
-                        
-                        # Buscar el nombre del miembro deudor
-                        from_name = None
-                        if "family" in context.user_data and "members" in context.user_data["family"]:
-                            for m in context.user_data["family"]["members"]:
-                                if str(m.get("id")) == str(from_id):
-                                    from_name = m.get("name")
-                                    break
-                        
-                        if not from_name:
-                            from_name = f"Usuario {from_id}"
-                        
-                        if amount > 0:
-                            print(f"[AJUSTE_DEUDAS] Crédito alternativo encontrado: {from_name} debe {amount} a {member_name}")
-                            credits.append((from_name, from_id, amount))
         
         # Guardar los créditos en el contexto
         context.user_data["adjustment_data"]["credits"] = credits

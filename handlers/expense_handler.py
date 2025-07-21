@@ -660,8 +660,8 @@ async def listar_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Ordenar los gastos por fecha (más recientes primero)
         expenses.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         
-        # Iterar sobre cada gasto para formatear la información
-        for expense in expenses:
+        # Iterar sobre cada gasto para formatear la información (limitado a 10 más recientes)
+        for expense in expenses[:10]:
             expense_id = expense.get("id")
             description = expense.get("description", "Sin descripción")
             amount = expense.get("amount", 0)

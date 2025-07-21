@@ -1010,7 +1010,7 @@ async def listar_pagos(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as edit_error:
                 # Si hay un error al editar el mensaje, enviamos uno nuevo
-            await update.message.reply_text(
+                await update.message.reply_text(
                     Messages.NO_PAYMENTS,
                     reply_markup=Keyboards.get_main_menu_keyboard()
                 )
